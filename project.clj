@@ -7,14 +7,13 @@ of how to use this library."
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.2"]
-                 [techascent/tech.ml.dataset "5.01"]
+                 [techascent/tech.ml.dataset "5.04"]
                  [ml.dmlc/xgboost4j_2.12 "1.3.1"]
                  [ml.dmlc/xgboost4j-spark_2.12 "1.3.1"]
-                 [org.bytedeco/openblas "0.3.10-1.5.4"]
+                 [scicloj/metamorph.ml "0.2.0-alpha1"]
                  [org.apache.hadoop/hadoop-common "3.3.0"
                   :exclusions [org.apache.commons/commons-math3
                                org.slf4j/slf4j-log4j12]]
-                 [org.bytedeco/openblas-platform "0.3.10-1.5.4"]
                  [pppmap/pppmap "0.2.1"]]
 
 

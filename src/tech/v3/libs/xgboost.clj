@@ -4,9 +4,9 @@
   functionality."
   (:require [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
-            [tech.v3.ml :as ml]
-            [tech.v3.ml.model :as model]
-            [tech.v3.ml.gridsearch :as ml-gs]
+            [scicloj.metamorph.ml :as ml]
+            [scicloj.metamorph.ml.model :as model]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.tensor :as ds-tens]
             [tech.v3.dataset.modelling :as ds-mod]
