@@ -21,7 +21,6 @@
            [java.util Iterator UUID LinkedHashMap Map]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
-
 (set! *warn-on-reflection* true)
 
 
