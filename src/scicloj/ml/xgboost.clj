@@ -1,4 +1,4 @@
-(ns tech.v3.libs.xgboost
+(ns scicloj.ml.xgboost
   "Require this namespace to get xgboost support for classification and regression.
   Defines a full range of xgboost model definitions and supports xgboost explain
   functionality."

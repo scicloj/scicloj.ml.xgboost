@@ -1,4 +1,4 @@
-(ns tech.v3.libs.xgboost-test
+(ns scicloj.ml.xgboost-test
   (:require [clojure.test :refer [deftest is]]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.column-filters :as cf]
@@ -7,13 +7,13 @@
             [tech.v3.datatype.functional :as dfn]
             ;; [tech.v3.libs.smile.discrete-nb :as nb]
             ;; [tech.v3.libs.smile.nlp :as nlp]
-            [tech.v3.libs.xgboost]
+            [scicloj.ml.xgboost]
             [scicloj.metamorph.ml :as ml]
             [scicloj.metamorph.ml.metrics :as metrics]
             [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml.verify :as verify]
             [scicloj.metamorph.ml.classification :as ml-class]
-            [tech.v3.libs.xgboost]))
+            ))
 
 (deftest basic
   (verify/basic-regression {:model-type :xgboost/regression}))
