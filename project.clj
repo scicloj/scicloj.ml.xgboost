@@ -1,9 +1,6 @@
 (defproject scicloj/scicloj.ml.xgboost "5.02"
-  :description "Basic machine learning toolkit.  `tech.v3.ml` is the root
-namespace and provides train/predict pathways based on datasets and
-an options map.  Please see the xgboost article for a quick runthough
-of how to use this library."
-  :url "http://github.com/techascent/tech.ml-base"
+  :description "xgboost models for scicloj.ml"
+  :url "https://github.com/scicloj/scicloj.ml.xgboost"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.10.2"]
