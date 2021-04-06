@@ -1,4 +1,4 @@
-(defproject scicloj/scicloj.ml.xgboost "5.02"
+(defproject scicloj/scicloj.ml.xgboost "5.03"
   :description "Basic machine learning toolkit.  `tech.v3.ml` is the root
 namespace and provides train/predict pathways based on datasets and
 an options map.  Please see the xgboost article for a quick runthough
@@ -10,7 +10,7 @@ of how to use this library."
                  [techascent/tech.ml.dataset "5.04"]
                  [ml.dmlc/xgboost4j_2.12 "1.3.1"]
                  [ml.dmlc/xgboost4j-spark_2.12 "1.3.1"]
-                 [scicloj/metamorph.ml "0.2.0-alpha1"]
+                 [scicloj/metamorph.ml "0.3.0-beta1"]
                  [org.apache.hadoop/hadoop-common "3.3.0"
                   :exclusions [org.apache.commons/commons-math3
                                org.slf4j/slf4j-log4j12]]
