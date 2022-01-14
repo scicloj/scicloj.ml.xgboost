@@ -24,58 +24,123 @@
 (set! *warn-on-reflection* true)
 
 
-(def ^:private objective-types
-  {:linear-regression "reg:linear"
-   :squared-error-regression "reg:squarederror"
-   :logistic-regression "reg:logistic"
+(def objective-types
+  {:linear-regression
+   {:objective "reg:linear"
+    :options [{:name :eta
+               :description "Step size shrinkage used in update to prevents overfitting. After each boosting step, we can directly get the weights of new features, and eta shrinks the feature weights to make the boosting process more conservative."}
+              {:name :gamma
+               :description "Minimum loss reduction required to make a further partition on a leaf node of the tree. The larger gamma is, the more conservative the algorithm will be."}
+              {:name :max-depth
+               :description "Maximum depth of a tree. Increasing this value will make the model more complex and more likely to overfit. 0 is only accepted in lossguide growing policy when tree_method is set as hist or gpu_hist and it indicates no limit on depth. Beware that XGBoost aggressively consumes memory when training a deep tree."}
+              {:name :min-child-weight
+               :description "Minimum sum of instance weight (hessian) needed in a child. If the tree partition step results in a leaf node with the sum of instance weight less than min_child_weight, then the building process will give up further partitioning. In linear regression task, this simply corresponds to minimum number of instances needed to be in each node. The larger min_child_weight is, the more conservative the algorithm will be."}
+              {:name "max_delta_step "
+               :description "Maximum delta step we allow each leaf output to be. If the value is set to 0, it means there is no constraint. If it is set to a positive value, it can help making the update step more conservative. Usually this parameter is not needed, but it might help in logistic regression when class is extremely imbalanced. Set it to value of 1-10 might help control the update."}
+              {:name "subsample"
+               :description "Subsample ratio of the training instances. Setting it to 0.5 means that XGBoost would randomly sample half of the training data prior to growing trees. and this will prevent overfitting. Subsampling will occur once in every boosting iteration."}
+              {:name "sampling_method"
+               :description "The method to use to sample the training instances.\nuniform: each training instance has an equal probability of being selected. Typically set subsample >= 0.5 for good results.\n
+gradient_based: the selection probability for each training instance is proportional to the regularized absolute value of gradients (more specifically, ).
+subsample may be set to as low as 0.1 without loss of model accuracy. Note that this sampling method is only supported when tree_method is set to gpu_hist; other tree methods only support uniform sampling.
+"}
+              {:name "colsample_bytree"
+               :description ""}
+              {:name "colsample_bylevel"
+               :description ""}
+              {:name "colsample_bynode"
+               :description ""}
+              {:name "lambda"
+               :description "L2 regularization term on weights. Increasing this value will make model more conservative."}
+              {:name "alpha"
+               :description "L1 regularization term on weights. Increasing this value will make model more conservative."}
+              {:name "tree_method"
+               :description ""}
+              {:name "sketch_eps"
+               :description ""}
+              {:name "scale_pos_weight"
+               :description ""}
+              {:name "updater"
+               :description ""}
+              {:name "refresh_leaf"
+               :description ""}
+              {:name "process_type"
+               :description ""}
+              {:name "grow_policy"
+               :description ""}
+              {:name "max_leaves"
+               :description ""}
+              {:name "max_bin"
+               :description ""}
+              {:name "predictor"
+               :description ""}
+              {:name "num_parallel_tree"
+               :description ""}
+              {:name "monotone_constraints"
+               :description ""}
+              {:name "interaction_constraints"
+               :description ""}]}
+
+
+
+
+
+
+
+   :squared-error-regression {:objective "reg:squarederror"}
+
+
+   :logistic-regression {:objective  "reg:logistic"}
    ;;logistic regression for binary classification
-   :logistic-binary-classification "binary:logistic"
+   :logistic-binary-classification {:objective "binary:logistic"}
    ;; logistic regression for binary classification, output score before logistic
    ;; transformation
-   :logistic-binary-raw-classification "binary:logitraw"
-    ;;hinge loss for binary classification. This makes predictions of 0 or 1, rather
-    ;;than producing probabilities.
-   :binary-hinge-loss "binary:hinge"
+   :logistic-binary-raw-classification {:objective "binary:logitraw"}
+   ;;hinge loss for binary classification. This makes predictions of 0 or 1, rather
+   ;;than producing probabilities.
+   :binary-hinge-loss {:objective "binary:hinge"}
    ;; versions of the corresponding objective functions evaluated on the GPU; note that
    ;; like the GPU histogram algorithm, they can only be used when the entire training
    ;; session uses the same dataset
-   :gpu-linear-regression "gpu:reg:linear"
-   :gpu-logistic-regression "gpu:reg:logistic"
-   :gpu-binary-logistic-classification "gpu:binary:logistic"
-   :gpu-binary-logistic-raw-classification "gpu:binary:logitraw"
+   :gpu-linear-regression {:objective "gpu:reg:linear"}
+   :gpu-logistic-regression {:objective "gpu:reg:logistic"}
+   :gpu-binary-logistic-classification {:objective "gpu:binary:logistic"}
+   :gpu-binary-logistic-raw-classification {:objective "gpu:binary:logitraw"}
 
    ;; poisson regression for count data, output mean of poisson distribution
    ;; max_delta_step is set to 0.7 by default in poisson regression (used to safeguard
    ;; optimization)
-   :count-poisson "count:poisson"
+   :count-poisson {:objective "count:poisson"}
 
    ;; Cox regression for right censored survival time data (negative values are
    ;; considered right censored). Note that predictions are returned on the hazard ratio
    ;; scale (i.e., as HR = exp(marginal_prediction) in the proportional hazard function
    ;; h(t) = h0(t) * HR).
-   :survival-cox "survival:cox"
+   :survival-cox {:objective "survival:cox"}
    ;; set XGBoost to do multiclass classification using the softmax objective, you also
    ;; need to set num_class(number of classes)
-   :multiclass-softmax "multi:softmax"
+   :multiclass-softmax {:objective "multi:softmax"}
    ;; same as softmax, but output a vector of ndata * nclass, which can be further
    ;; reshaped to ndata * nclass matrix. The result contains predicted probability of
    ;; each data point belonging to each class.
-   :multiclass-softprob "multi:softprob"
+   :multiclass-softprob {:objective "multi:softprob"}
    ;; Use LambdaMART to perform pairwise ranking where the pairwise loss is minimized
-   :rank-pairwise "rank:pairwise"
+   :rank-pairwise {:objective "rank:pairwise"}
    ;; Use LambdaMART to perform list-wise ranking where Normalized Discounted Cumulative
    ;; Gain (NDCG) is maximized
-   :rank-ndcg "rank:ndcg"
+   :rank-ndcg {:objective "rank:ndcg"}
    ;; Use LambdaMART to perform list-wise ranking where Mean Average Precision (MAP) is
    ;; maximized
-   :rank-map "rank:map"
+   :rank-map {:objective "rank:map"}
    ;; gamma regression with log-link. Output is a mean of gamma distribution. It might
    ;; be useful, e.g., for modeling insurance claims severity, or for any outcome that
    ;; might be gamma-distributed.
-   :gamma-regression "reg:gamma"
-    ;; Tweedie regression with log-link. It might be useful, e.g., for modeling total
-    ;; loss in insurance, or for any outcome that might be Tweedie-distributed.
-   :tweedie-regression "reg:tweedie"})
+   :gamma-regression {:objective "reg:gamma"}
+   ;; Tweedie regression with log-link. It might be useful, e.g., for modeling total
+   ;; loss in insurance, or for any outcome that might be Tweedie-distributed.
+   :tweedie-regression {:objective "reg:tweedie"}})
+
+
 
 
 (defmulti ^:private model-type->xgboost-objective
@@ -85,7 +150,7 @@
 
 (defmethod model-type->xgboost-objective :default
   [model-type]
-  (if-let [retval (get objective-types model-type)]
+  (if-let [retval (get-in objective-types [model-type :objective])]
     retval
     (throw (ex-info "Unrecognized xgboost model type"
                     {:model-type model-type
@@ -126,8 +191,8 @@
                (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
                (get feature-ds sparse-column)
                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
-                    (repeat 0.0)
-                    ))) nil))
+                    (repeat 0.0))))
+   nil))
 
 
 (defn- dataset->labeled-point-iterator
@@ -237,8 +302,8 @@ c/xgboost4j/java/XGBoost.java#L208"))
                               :max-depth 6
                               :scale-pos-weight 1.0
                               :subsample 0.87
-                              :silent 1
-                              }
+                              :silent 1}
+                              
                              options
                              (when label-map
                                {:num-class (count label-map)}))
@@ -304,7 +369,7 @@ c/xgboost4j/java/XGBoost.java#L208"))
     (if sparse-column-or-nil
       (let [score-map (.getScore booster "" (str importance-type))]
         (ds/->dataset {:feature (keys score-map)
-                       (keyword importance-type) (vals score-map) }))
+                       (keyword importance-type) (vals score-map)}))
       (let [feature-col-map (->> feature-columns
                                  (map (fn [name]
                                         [name (ds-utils/column-safe-name name)]))
@@ -328,10 +393,16 @@ c/xgboost4j/java/XGBoost.java#L208"))
 
 (doseq [objective (concat [:regression :classification]
                           (keys objective-types))]
-  (ml/define-model! (keyword "xgboost" (name objective))
-    train predict {:thaw-fn thaw-model
-                   :explain-fn explain
-                   :hyperparameters hyperparameters}))
+  (let [reg-def (get objective-types objective)]
+    (ml/define-model! (keyword "xgboost" (name objective))
+      train predict {:thaw-fn thaw-model
+                     :explain-fn explain
+                     :options (:options reg-def)
+
+                     :hyperparameters hyperparameters
+                     :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
+                                     :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}})))
+
 
 
 (comment
@@ -398,6 +469,8 @@ c/xgboost4j/java/XGBoost.java#L208"))
     (->> (map test-options options-sequence)
          (sort-by :loss)
          (take 10)
-         (map #(select-keys % [:loss :options]))))
+         (map #(select-keys % [:loss :options])))))
   ;;consistently gets .849 or so accuracy on best models.
-  )
+  
+
+
