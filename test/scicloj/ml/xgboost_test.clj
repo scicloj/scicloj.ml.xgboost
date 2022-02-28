@@ -12,8 +12,8 @@
             [scicloj.metamorph.ml.metrics :as metrics]
             [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml.verify :as verify]
-            [scicloj.metamorph.ml.classification :as ml-class]
-            ))
+            [scicloj.metamorph.ml.classification :as ml-class]))
+            
 
 (deftest basic
   (verify/basic-regression {:model-type :xgboost/regression}))
@@ -79,7 +79,7 @@
   (def reviews
 
     (->
-     (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword })
+     (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
      (ds/select-columns [:Text :Score])
      (nlp/count-vectorize :Text :bow nlp/default-text->bow)
      (nb/bow->SparseArray :bow :bow-sparse  #(nlp/->vocabulary-top-n % 100))
@@ -94,8 +94,8 @@
                                         5 :c5}]
                            (dtype/emap val-map :keyword col))))
      (ds/categorical->number cf/categorical)
-     (ds-mod/set-inference-target :Score))
-    )
+     (ds-mod/set-inference-target :Score)))
+    
   (def trained-model
     (ml/train reviews {:model-type :xgboost/classification
                        :sparse-column :bow-sparse
@@ -103,19 +103,19 @@
                        :silent 0
                        :round 1
                        :eval-metric "merror"
-                       :watches {:test-ds (ds/sample  reviews 10)}
-                       }))
+                       :watches {:test-ds (ds/sample  reviews 10)}}))
+                       
 
 
   (def prediction
     (:Score
-     (ml/predict reviews trained-model )))
+     (ml/predict reviews trained-model)))
 
-  (metrics/accuracy (:Score reviews) prediction )
+  (metrics/accuracy (:Score reviews) prediction)
 
   (def folds
     (ml/train-k-fold reviews {:model-type :xgboost/classification
-                              :sparse-column :bow-sparse
+                              :sparse-column :bow-sparse}))
 
-                              }))
+                              
   (ml/explain folds))

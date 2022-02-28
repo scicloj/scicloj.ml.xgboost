@@ -4,8 +4,9 @@
   functionality."
   (:require [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
+            [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml :as ml]
-            [scicloj.metamorph.ml.model :as model]
+            [scicloj.ml.xgboost.model :as model]
             [scicloj.metamorph.ml.gridsearch :as ml-gs]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.tensor :as ds-tens]
@@ -349,15 +350,23 @@ c/xgboost4j/java/XGBoost.java#L208"))
   (let [sparse-column-or-nil (:sparse-column options)
         dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
         prediction (.predict ^Booster thawed-model dmatrix)
-        predict-ds (->> prediction
-                        (dtt/->tensor))
+        predict-tensor (->> prediction
+                            (dtt/->tensor))
         target-cname (first target-columns)]
+
+
     (if (multiclass-objective? (options->objective options))
-      (model/finalize-classification predict-ds
-                                     (ds/row-count feature-ds)
-                                     target-cname
-                                     target-categorical-maps)
-      (model/finalize-regression predict-ds target-cname))))
+      (->
+       (model/finalize-classification predict-tensor
+                                      (ds/row-count feature-ds)
+                                      target-cname
+                                      target-categorical-maps)
+
+       (tech.v3.dataset.modelling/probability-distributions->label-column
+        (first target-columns)))
+      (model/finalize-regression predict-tensor target-cname))))
+
+    
 
 
 (defn- explain
@@ -428,6 +437,8 @@ c/xgboost4j/java/XGBoost.java#L208"))
   (loss/classification-accuracy (predictions "species")
                                 (test-ds "species"))
   ;;0.93333
+
+
 
   (def titanic (-> (ds/->dataset "test/data/titanic.csv")
                    (ds/drop-columns ["Name"])
