@@ -1,4 +1,4 @@
-(defproject scicloj/scicloj.ml.xgboost "5.1"
+(defproject scicloj/scicloj.ml.xgboost "5.1.1"
   :description "xgboost models for scicloj.ml"
   :url "https://github.com/scicloj/scicloj.ml.xgboost"
   :license {:name "Eclipse Public License"

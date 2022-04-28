@@ -363,7 +363,9 @@ c/xgboost4j/java/XGBoost.java#L208"))
                                       target-categorical-maps)
 
        (tech.v3.dataset.modelling/probability-distributions->label-column
-        (first target-columns)))
+        (first target-columns))
+       (ds/update-column (first  target-columns)
+                         #(vary-meta % assoc :column-type :prediction)))
       (model/finalize-regression predict-tensor target-cname))))
 
     
@@ -413,7 +415,7 @@ c/xgboost4j/java/XGBoost.java#L208"))
                                      :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}})))
 
 
-
+ 
 (comment
   (require '[tech.v3.dataset.column-filters :as cf])
   (def src-ds (ds/->dataset "test/data/iris.csv"))
