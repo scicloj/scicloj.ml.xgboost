@@ -5,8 +5,8 @@
             [tech.v3.dataset.modelling :as ds-mod]
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.functional :as dfn]
-            ;; [tech.v3.libs.smile.discrete-nb :as nb]
-            ;; [tech.v3.libs.smile.nlp :as nlp]
+            [scicloj.ml.smile.discrete-nb :as nb]
+            [scicloj.ml.smile.nlp :as nlp]
             [scicloj.ml.xgboost]
             [scicloj.metamorph.ml :as ml]
             [scicloj.metamorph.ml.metrics :as metrics]
@@ -48,32 +48,37 @@
   (verify/basic-classification {:model-type :xgboost/classification}))
 
 ;;  TODO re-enable and solve test dependency to tech.ml.smile.smiple
-;; (deftest sparse-train-does-not-crash []
-;;     (let [reviews
-;;           (->
-;;            (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword })
-;;            (ds/select-columns [:Text :Score])
-;;            (nlp/count-vectorize :Text :bow nlp/default-text->bow)
-;;            (nb/bow->SparseArray :bow :bow-sparse  #(nlp/->vocabulary-top-n % 100))
-;;            (ds/drop-columns [:Text :bow])
-;;            (ds/update-column :Score
-;;                              (fn [col]
-;;                                (let [val-map {0 :c0
-;;                                               1 :c1
-;;                                               2 :c2
-;;                                               3 :c3
-;;                                               4 :c4
-;;                                               5 :c5}]
-;;                                  (dtype/emap val-map :keyword col))))
-;;            (ds/categorical->number cf/categorical)
-;;            (ds-mod/set-inference-target :Score))
-;;           folds
-;;           (ml/train-k-fold reviews {:model-type :xgboost/classification
-;;                                     :sparse-column :bow-sparse
-;;                                     :n-sparse-columns 100
-;;                                     })
-;;           explanation (ml/explain folds)
-;;           ]))
+(deftest sparse-train-does-not-crash []
+  (let [reviews
+        (->
+         (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
+         (ds/select-columns [:Text :Score])
+         (nlp/count-vectorize :Text :bow nlp/default-text->bow)
+         (nb/bow->SparseArray :bow :bow-sparse {:create-vocab-fn  #(nlp/->vocabulary-top-n % 100)})
+         (ds/drop-columns [:Text :bow])
+         (ds/update-column :Score
+                           (fn [col]
+                             (let [val-map {0 :c0
+                                            1 :c1
+                                            2 :c2
+                                            3 :c3
+                                            4 :c4
+                                            5 :c5}]
+                               (dtype/emap val-map :keyword col))))
+         (ds/categorical->number cf/categorical)
+         (ds-mod/set-inference-target :Score))
+        model
+        (ml/train reviews {:model-type :xgboost/classification
+                           :sparse-column :bow-sparse
+                           :n-sparse-columns 100})
+
+        _ (ml/explain model)]
+       (is true)))
+
+
+
+
+          
 
 (comment
   (def reviews
