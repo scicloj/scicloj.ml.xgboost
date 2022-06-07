@@ -6,7 +6,7 @@
 (def lib ' scicloj/scicloj.ml.xgboost)
 ; alternatively, use MAJOR.MINOR.COMMITS:
 ;; (def version (format "7.0.%s" (b/git-count-revs nil)))
-(def version "5.1.2")
+(def version "5.1.3")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 (def jar-file (format "target/%s-%s.jar" (name lib) version))
