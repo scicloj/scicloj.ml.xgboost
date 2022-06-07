@@ -1,10 +1,10 @@
 {:paths ["src" "target/classes"]
  :deps
- {org.clojure/clojure {:mvn/version "1.10.2"}
+ {org.clojure/clojure {:mvn/version "1.11.1"}
   ml.dmlc/xgboost4j_2.12 {:mvn/version "1.6.1"}
   ml.dmlc/xgboost4j-spark_2.12 {:mvn/version "1.6.1"}
-  scicloj/metamorph.ml {:mvn/version "0.6.0"}
-  techascent/tech.ml.dataset {:mvn/version "6.086"}
+  scicloj/metamorph.ml {:mvn/version "0.6.1"}
+  techascent/tech.ml.dataset {:mvn/version "6.087"}
   org.apache.hadoop/hadoop-common {:mvn/version "3.3.0"
                                    :exclusions [org.apache.commons/commons-math3
                                                 org.slf4j/slf4j-log4j12]}
@@ -28,7 +28,8 @@
            :run-tests {:main-opts ["-m" "kaocha.runner"]}
            :test {:extra-paths ["test"]
 
-                  :extra-deps {scicloj/scicloj.ml.smile {:mvn/version "7.0.600"}
+                  :extra-deps {scicloj/scicloj.ml.smile
+                               {:mvn/version "7.0.603"}
                                lambdaisland/kaocha {:mvn/version "1.60.945"}
                                org.clojure/test.check {:mvn/version "1.1.0"}}}}}
                   
