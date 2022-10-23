@@ -1,3 +1,5 @@
+[![Clojars Project](https://img.shields.io/clojars/v/scicloj/scicloj.ml.xgboost.svg)](https://clojars.org/scicloj/scicloj.ml.xgboost)
+
 # scicloj.ml.xgboost
 
 xgboost models for [metamorph.ml](https://github.com/scicloj/metamorph.ml) and [scicloj.ml](https://github.com/scicloj/scicloj.ml)
