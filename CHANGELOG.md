@@ -1,4 +1,11 @@
 # ConstantChangeLog
+
+## 6.0.0
+Upgrade to tablecloth 7.0
+
+...
+...
+
 ## 3.00
  * Upgrade to smile 2.5.0.
  * Minimum workingtech.ml.dataset version is 4.00

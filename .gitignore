@@ -13,3 +13,6 @@ pom.xml.asc
 example/data
 example/results.nippy
 .cpcache
+.clj-kondo
+.calva
+.lsp

@@ -401,18 +401,30 @@ c/xgboost4j/java/XGBoost.java#L208"))
              (sort-by (keyword importance-type) >)
              (ds/->>dataset))))))
 
+(defn- assoc-if
+  [m key value]
+  (if value (assoc m key value) m))
 
 (doseq [objective (concat [:regression :classification]
                           (keys objective-types))]
-  (let [reg-def (get objective-types objective)]
+  (let [reg-def (get objective-types objective)
+        model-meta 
+        {:thaw-fn thaw-model
+         :explain-fn explain
+         
+         
+         :hyperparameters hyperparameters
+         :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
+                         :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}}
+        model-meta (assoc-if model-meta :options (:options reg-def) )
+        ]
+    ;; (def objective objective)
+    ;; (def reg-def reg-def)
+    ;; (println :reg-def reg-def)
+    ;; (println :options (:options reg-def))
     (ml/define-model! (keyword "xgboost" (name objective))
-      train predict {:thaw-fn thaw-model
-                     :explain-fn explain
-                     :options (:options reg-def)
-
-                     :hyperparameters hyperparameters
-                     :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
-                                     :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}})))
+      
+      train predict model-meta)))
 
 
  

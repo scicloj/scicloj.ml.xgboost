@@ -47,7 +47,6 @@
 (deftest classification
   (verify/basic-classification {:model-type :xgboost/classification}))
 
-;;  TODO re-enable and solve test dependency to tech.ml.smile.smiple
 (deftest sparse-train-does-not-crash []
   (let [reviews
         (->
