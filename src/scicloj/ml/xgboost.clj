@@ -256,6 +256,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   [feature-ds label-ds options]
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
+  (def feature-ds feature-ds)
+  (def label-ds label-ds)
   (locking #'multiclass-objective?
     (let [objective (options->objective options)
           sparse-column-or-nil (:sparse-column options)
@@ -264,7 +266,14 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
           feature-cnames (ds/column-names feature-ds)
           target-cnames (ds/column-names label-ds)
           watches (->> base-watches
-                       (reduce (fn [^Map watches [k v]]
+                       (reduce (fn  [^Map watches [k v]]
+                                 (def k k)
+                                 (def v v)
+                                 (def feature-cnames feature-cnames)
+                                 (def target-cnames target-cnames)
+                                 (def sparse-column-or-nil sparse-column-or-nil)
+                                 (def watches watches)
+                                 (def options options)
                                  (.put watches (ds-utils/column-safe-name k)
                                        (->dmatrix
                                         (ds/select-columns v feature-cnames)
@@ -317,6 +326,8 @@ c/xgboost4j/java/XGBoost.java#L208"))
                                 (->> (repeatedly (count watches)
                                                  #(float-array round))
                                      (into-array)))
+          _ (def metrics-data metrics-data)
+          _ (clojure.pprint/pprint (dissoc params "watches"))
           ^Booster model (XGBoost/train train-dmat params
                                         (long round)
                                         (or watches {}) metrics-data nil nil
@@ -496,6 +507,3 @@ c/xgboost4j/java/XGBoost.java#L208"))
          (take 10)
          (map #(select-keys % [:loss :options])))))
   ;;consistently gets .849 or so accuracy on best models.
-  
-
-
