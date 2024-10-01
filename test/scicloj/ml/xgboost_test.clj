@@ -205,16 +205,33 @@
                                (dtype/emap val-map :keyword col))))
          (ds/categorical->number cf/categorical)
          (ds-mod/set-inference-target :Score)))
-      
+
+
+
+      (def feature-ds
+        (cf/feature reviews))
+
+      (def target-ds
+        (cf/target reviews))
+
+      (require '[scicloj.ml.xgboost])
+      (def d
+        (scicloj.ml.xgboost/sparse-feature->dmatrix 
+         feature-ds
+         target-ds
+         :bow-sparse
+         1000
+         ))
       (def trained-model
         (ml/train reviews {:model-type :xgboost/classification
                            :sparse-column :bow-sparse
-                           :n-sparse-columns 100
-                           :silent 0
-                           :round 1
-                           :eval-metric "merror"
-                           :watches {:test-ds (ds/sample  reviews 10)}}))
-      
+                           :n-sparse-columns 1000
+                           ;:silent 0
+                           ;:round 1
+                           ;:eval-metric "merror"
+                           ;:watches {:test-ds (ds/sample  reviews 10)}
+                           }))
+
 
 
       (def prediction
@@ -227,5 +244,6 @@
         (ml/train-k-fold reviews {:model-type :xgboost/classification
                                   :sparse-column :bow-sparse}))
 
-      
-      (ml/explain folds))
+
+      (ml/explain folds)
+      )

@@ -174,16 +174,17 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 (defn- sparse->labeled-point [^SparseArray sparse target n-sparse-columns]
   (let [x-i-s
-        (map
+        (mapv
          #(hash-map :i  (.i ^SparseArray$Entry %) :x (.x ^SparseArray$Entry %))
          (iterator-seq
           (.iterator sparse)))]
+    (println :x-i-s (count x-i-s))
     (LabeledPoint. target
                    n-sparse-columns
                    (into-array Integer/TYPE (map :i x-i-s))
                    (into-array Float/TYPE (map :x x-i-s)))))
 
-(defn- sparse-feature->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
+(defn sparse-feature->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
   (DMatrix.
    (.iterator
     ^Iterable (map
@@ -192,6 +193,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
                     (repeat 0.0))))
    nil))
+
 
 
 (defn- dataset->labeled-point-iterator
@@ -297,11 +299,14 @@ c/xgboost4j/java/XGBoost.java#L208"))
           params (->>  cleaned-options
                       ;;Adding in some defaults
                        (merge
-                        {:alpha 0.0
-                         :eta 0.3
-                         :lambda 1.0
-                         :max-depth 6
-                         :subsample 0.87}
+                        {
+                        ;;  :alpha 0.0
+                        ;;  :eta 0.3
+                        ;;  :lambda 1.0
+                        ;;  :max-depth 6
+                        ;;  :subsample 0.87
+                         
+                         }
                         
                         cleaned-options
                         (when label-map
