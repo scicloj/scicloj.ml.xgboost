@@ -4,7 +4,6 @@
   functionality."
   (:require [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
-            [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml :as ml]
             [scicloj.ml.xgboost.model :as model]
             [scicloj.metamorph.ml.gridsearch :as ml-gs]
@@ -15,17 +14,13 @@
             [tech.v3.tensor :as dtt]
             [clojure.set :as set]
             [clojure.string :as s]
-            [clojure.tools.logging :as log]
-            
-            
-            [tech.v3.dataset.column-filters :as cf])
+            [clojure.tools.logging :as log])
   (:import [ml.dmlc.xgboost4j.java Booster XGBoost  DMatrix]
            [ml.dmlc.xgboost4j LabeledPoint]
            [smile.util SparseArray SparseArray$Entry]
            [java.util LinkedHashMap Map]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
-(set! *warn-on-reflection* true)
 
 
 (def objective-types
@@ -259,8 +254,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   [feature-ds label-ds options]
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
-  (def feature-ds feature-ds)
-  (def label-ds label-ds)
   (locking #'multiclass-objective?
     (let [objective (options->objective options)
           sparse-column-or-nil (:sparse-column options)
@@ -270,13 +263,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
           target-cnames (ds/column-names label-ds)
           watches (->> base-watches
                        (reduce (fn  [^Map watches [k v]]
-                                 (def k k)
-                                 (def v v)
-                                 (def feature-cnames feature-cnames)
-                                 (def target-cnames target-cnames)
-                                 (def sparse-column-or-nil sparse-column-or-nil)
-                                 (def watches watches)
-                                 (def options options)
                                  (.put watches (ds-utils/column-safe-name k)
                                        (->dmatrix
                                         (ds/select-columns v feature-cnames)
@@ -330,7 +316,6 @@ c/xgboost4j/java/XGBoost.java#L208"))
                                                  #(float-array round))
                                      (into-array)))
           
-          _ (clojure.pprint/pprint params)
           ^Booster model (XGBoost/train train-dmat params
                                         (long round)
                                         (or watches {}) metrics-data nil nil
@@ -425,19 +410,11 @@ c/xgboost4j/java/XGBoost.java#L208"))
         model-meta 
         {:thaw-fn thaw-model
          :explain-fn explain
-         
-         
          :hyperparameters hyperparameters
          :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
                          :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}}
-        model-meta (assoc-if model-meta :options (:options reg-def) )
-        ]
-    ;; (def objective objective)
-    ;; (def reg-def reg-def)
-    ;; (println :reg-def reg-def)
-    ;; (println :options (:options reg-def))
+        model-meta (assoc-if model-meta :options (:options reg-def) ) ]
     (ml/define-model! (keyword "xgboost" (name objective))
-      
       train predict model-meta)))
 
 
