@@ -1,8 +1,8 @@
 {:paths ["src" "target/classes"]
  :deps
  {org.clojure/clojure               {:mvn/version "1.11.1"}
-  ml.dmlc/xgboost4j_2.12            {:mvn/version "1.6.1"}
-  ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "1.6.1"}
+  ml.dmlc/xgboost4j_2.12            {:mvn/version "1.7.6"}
+  ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "1.7.6"}
   org.scicloj/metamorph.ml          {:mvn/version "0.9.0"}
 
   com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
