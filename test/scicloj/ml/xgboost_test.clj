@@ -16,13 +16,14 @@
             
 
 (deftest basic
-  (verify/basic-regression {:model-type :xgboost/regression}))
+  (verify/basic-regression {:model-type :xgboost/regression} 0.22))
 
 
 (deftest basic-early-stopping
   (verify/basic-regression {:model-type :xgboost/regression
                             :early-stopping-round 5
-                            :round 50}))
+                            :round 50}
+                           0.22))
 
 
 (deftest watches
@@ -45,7 +46,7 @@
 
 
 (deftest classification
-  (verify/basic-classification {:model-type :xgboost/classification}))
+  (verify/basic-classification {:model-type :xgboost/classification} 0.2))
 
 (deftest sparse-train-does-not-crash []
   (let [reviews
