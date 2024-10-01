@@ -15,11 +15,14 @@
             [tech.v3.tensor :as dtt]
             [clojure.set :as set]
             [clojure.string :as s]
-            [clojure.tools.logging :as log])
-  (:import [ml.dmlc.xgboost4j.java Booster XGBoost XGBoostError DMatrix]
+            [clojure.tools.logging :as log]
+            
+            
+            [tech.v3.dataset.column-filters :as cf])
+  (:import [ml.dmlc.xgboost4j.java Booster XGBoost  DMatrix]
            [ml.dmlc.xgboost4j LabeledPoint]
            [smile.util SparseArray SparseArray$Entry]
-           [java.util Iterator UUID LinkedHashMap Map]
+           [java.util LinkedHashMap Map]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (set! *warn-on-reflection* true)
@@ -301,33 +304,33 @@ c/xgboost4j/java/XGBoost.java#L208"))
                            (into {}))
           label-map (when (multiclass-objective? objective)
                       (ds-mod/inference-target-label-map label-ds))
-          params (->> (-> (dissoc options :model-type :watches)
-                          (assoc :objective objective))
+          cleaned-options 
+          (->
+           (dissoc options :model-type :watches)
+           (assoc :objective objective))
+          params (->>  cleaned-options
                       ;;Adding in some defaults
-                      (merge {}
-                             {
-                              :alpha 0.0
-                              :eta 0.3
-                              :lambda 1.0
-                              :max-depth 6
-                              :scale-pos-weight 1.0
-                              :subsample 0.87
-                              :silent 1}
-                              
-                             options
-                             (when label-map
-                               {:num-class (count label-map)}))
-                      (map (fn [[k v]]
-                             (when v
-                               [(s/replace (name k) "-" "_" ) v])))
-                      (remove nil?)
-                      (into {}))
+                       (merge
+                        {:alpha 0.0
+                         :eta 0.3
+                         :lambda 1.0
+                         :max-depth 6
+                         :subsample 0.87}
+                        
+                        cleaned-options
+                        (when label-map
+                          {:num-class (count label-map)}))
+                       (map (fn [[k v]]
+                              (when v
+                                [(s/replace (name k) "-" "_" ) v])))
+                       (remove nil?)
+                       (into {}))
           ^"[[F" metrics-data (when-not (empty? watches)
                                 (->> (repeatedly (count watches)
                                                  #(float-array round))
                                      (into-array)))
-          _ (def metrics-data metrics-data)
-          _ (clojure.pprint/pprint (dissoc params "watches"))
+          
+          _ (clojure.pprint/pprint params)
           ^Booster model (XGBoost/train train-dmat params
                                         (long round)
                                         (or watches {}) metrics-data nil nil
@@ -439,71 +442,5 @@ c/xgboost4j/java/XGBoost.java#L208"))
 
 
  
-(comment
-  (require '[tech.v3.dataset.column-filters :as cf])
-  (def src-ds (ds/->dataset "test/data/iris.csv"))
-  (def ds (->  src-ds
-               (ds/categorical->number cf/categorical)
-               (ds-mod/set-inference-target "species")))
-  (def feature-ds (cf/feature ds))
-  (def split-data (ds-mod/train-test-split ds))
-  (def train-ds (:train-ds split-data))
-  (def test-ds (:test-ds split-data))
-  (def model (ml/train train-ds {:validate-parameters 1
-                                 :round 10
-                                 :silent 0
-                                 :verbosity 3
-                                 :model-type :xgboost/classification}))
-  (def predictions (ml/predict test-ds model))
-  (ml/explain model)
-  (require '[tech.v3.ml.loss :as loss])
-  (require '[tech.v3.dataset.categorical :as ds-cat])
-
-  (loss/classification-accuracy (predictions "species")
-                                (test-ds "species"))
-  ;;0.93333
 
 
-
-  (def titanic (-> (ds/->dataset "test/data/titanic.csv")
-                   (ds/drop-columns ["Name"])
-                   (ds/update-column "Survived" (fn [col]
-                                                  (dtype/emap #(if (== 1 (long %))
-                                                                 "survived"
-                                                                 "drowned")
-                                                              :string col)))
-                   (ds-mod/set-inference-target "Survived")))
-
-  (def titanic-numbers (ds/categorical->number titanic cf/categorical))
-
-  (def split-data (ds-mod/train-test-split titanic-numbers))
-  (def train-ds (:train-ds split-data))
-  (def test-ds (:test-ds split-data))
-  (def model (ml/train train-ds {:model-type :xgboost/classification}))
-  (def predictions (ml/predict test-ds model))
-
-  (loss/classification-accuracy (predictions "Survived")
-                                (test-ds "Survived"))
-  ;;0.8195488721804511
-  ;;0.8308270676691729
-  (require '[tech.v3.ml.gridsearch :as ml-gs])
-  (def opt-map (merge {:model-type :xgboost/classification}
-                      hyperparameters))
-  (def options-sequence (take 200  (ml-gs/sobol-gridsearch opt-map)))
-
-
-  (defn test-options
-    [options]
-    (let [model (ml/train train-ds options)
-          predictions (ml/predict test-ds model)
-          loss (loss/classification-loss (predictions "Survived")
-                                         (test-ds "Survived"))]
-      (assoc model :loss loss)))
-
-
-  (def models
-    (->> (map test-options options-sequence)
-         (sort-by :loss)
-         (take 10)
-         (map #(select-keys % [:loss :options])))))
-  ;;consistently gets .849 or so accuracy on best models.

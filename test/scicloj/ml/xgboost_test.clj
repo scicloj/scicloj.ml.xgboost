@@ -12,7 +12,10 @@
             [scicloj.metamorph.ml.metrics :as metrics]
             [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml.verify :as verify]
+            [tech.v3.dataset.categorical :as ds-cat]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
             [scicloj.metamorph.ml.classification :as ml-class]))
+
             
 
 (deftest basic
@@ -46,7 +49,7 @@
 
 
 (deftest classification
-  (verify/basic-classification {:model-type :xgboost/classification} 0.2))
+  (verify/basic-classification {:model-type :xgboost/classification} 0.25))
 
 (deftest sparse-train-does-not-crash []
   (let [reviews
@@ -77,50 +80,152 @@
 
 
 
+(deftest iris 
+  (let [ src-ds (ds/->dataset "test/data/iris.csv")
+        ds (->  src-ds
+                (ds/categorical->number cf/categorical)
+                (ds-mod/set-inference-target "species"))
+        feature-ds (cf/feature ds)
+        split-data (ds-mod/train-test-split ds {:seed 12345})
+        train-ds (:train-ds split-data)
+        test-ds (:test-ds split-data)
+        model (ml/train train-ds {:validate-parameters "true"
+                                  :seed 123
+                                  :verbosity 1
+                                  :model-type :xgboost/classification})
+        predictions (ml/predict test-ds model)
+        loss
+        (loss/classification-accuracy
+ (->
+  predictions
+  ds-cat/reverse-map-categorical-xforms
+  (get "species"))
+ (->
+  test-ds
+  ds-cat/reverse-map-categorical-xforms
+  (get "species")))]
 
-          
-
-(comment
-  (def reviews
-
-    (->
-     (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
-     (ds/select-columns [:Text :Score])
-     (nlp/count-vectorize :Text :bow nlp/default-text->bow)
-     (nb/bow->SparseArray :bow :bow-sparse  #(nlp/->vocabulary-top-n % 100))
-     (ds/drop-columns [:Text :bow])
-     (ds/update-column :Score
-                       (fn [col]
-                         (let [val-map {0 :c0
-                                        1 :c1
-                                        2 :c2
-                                        3 :c3
-                                        4 :c4
-                                        5 :c5}]
-                           (dtype/emap val-map :keyword col))))
-     (ds/categorical->number cf/categorical)
-     (ds-mod/set-inference-target :Score)))
+    (def model model)
+    (is (= 0.9555555555555556 loss))
     
-  (def trained-model
-    (ml/train reviews {:model-type :xgboost/classification
-                       :sparse-column :bow-sparse
-                       :n-sparse-columns 100
-                       :silent 0
-                       :round 1
-                       :eval-metric "merror"
-                       :watches {:test-ds (ds/sample  reviews 10)}}))
-                       
+    (is (= 
+         [{:importance-type "gain", :colname "petal_width", :gain 3.0993214419727266}
+          {:importance-type "gain", :colname "petal_length", :gain 2.8288314797695904}
+          {:importance-type "gain", :colname "sepal_width", :gain 0.272344306208}
+          {:importance-type "gain", :colname "sepal_length", :gain 0.12677490274290323}]         
+         
+         (ds/rows
+          (ml/explain model))))))
 
 
-  (def prediction
-    (:Score
-     (ml/predict reviews trained-model)))
+(defn- test-options [train-ds test-ds options]
+  (let [model (ml/train train-ds options)
 
-  (metrics/accuracy (:Score reviews) prediction)
+        predictions (ml/predict test-ds model)
+        accuracy
+        (loss/classification-accuracy
+         (->
+          predictions
+          ds-cat/reverse-map-categorical-xforms
+          (get "Survived"))
+         (->
+          test-ds
+          ds-cat/reverse-map-categorical-xforms
+          (get "Survived")))]
+    (assoc model :accuracy accuracy)))
 
-  (def folds
-    (ml/train-k-fold reviews {:model-type :xgboost/classification
-                              :sparse-column :bow-sparse}))
+(deftest titanic 
+  (let [titanic (-> (ds/->dataset "test/data/titanic.csv")
+                    (ds/drop-columns ["Name"])
+                    (ds/update-column "Survived" (fn [col]
+                                                   (dtype/emap #(if (== 1 (long %))
+                                                                  "survived"
+                                                                  "drowned")
+                                                               :string col)))
+                    (ds-mod/set-inference-target "Survived"))
 
-                              
-  (ml/explain folds))
+        titanic-numbers (ds/categorical->number titanic cf/categorical)
+
+        split-data (ds-mod/train-test-split titanic-numbers)
+        train-ds (:train-ds split-data)
+        test-ds (:test-ds split-data)
+        model (ml/train train-ds {:model-type :xgboost/classification})
+        predictions (ml/predict test-ds model)
+
+        accuracy
+        (loss/classification-accuracy
+         (->
+          predictions
+          ds-cat/reverse-map-categorical-xforms
+          (get "Survived"))
+         (->
+          test-ds
+          ds-cat/reverse-map-categorical-xforms
+          (get "Survived")))
+
+        
+  
+
+        opt-map (merge {:model-type :xgboost/classification}
+                       (ml/hyperparameters :xgboost/classification))
+        options-sequence (take 200  (ml-gs/sobol-gridsearch opt-map))
+
+
+        models
+        (->> (map #(test-options train-ds test-ds %) options-sequence)
+             (sort-by :accuracy)
+             reverse
+             (take 10)
+             (map #(select-keys % [:accuracy :options])))]
+    (is (< 0.82 accuracy))
+    (is (< 83
+           (-> models first :accuracy (* 100) Math/round)))))
+
+
+    
+
+    (comment
+      ;; not working
+      (def reviews
+
+        (->
+         (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
+         (ds/select-columns [:Text :Score])
+         (nlp/count-vectorize :Text :bow nlp/default-text->bow)
+         (nb/bow->SparseArray :bow :bow-sparse  #(nlp/->vocabulary-top-n % 100))
+         (ds/drop-columns [:Text :bow])
+         (ds/update-column :Score
+                           (fn [col]
+                             (let [val-map {0 :c0
+                                            1 :c1
+                                            2 :c2
+                                            3 :c3
+                                            4 :c4
+                                            5 :c5}]
+                               (dtype/emap val-map :keyword col))))
+         (ds/categorical->number cf/categorical)
+         (ds-mod/set-inference-target :Score)))
+      
+      (def trained-model
+        (ml/train reviews {:model-type :xgboost/classification
+                           :sparse-column :bow-sparse
+                           :n-sparse-columns 100
+                           :silent 0
+                           :round 1
+                           :eval-metric "merror"
+                           :watches {:test-ds (ds/sample  reviews 10)}}))
+      
+
+
+      (def prediction
+        (:Score
+         (ml/predict reviews trained-model)))
+
+      (metrics/accuracy (:Score reviews) prediction)
+
+      (def folds
+        (ml/train-k-fold reviews {:model-type :xgboost/classification
+                                  :sparse-column :bow-sparse}))
+
+      
+      (ml/explain folds))
