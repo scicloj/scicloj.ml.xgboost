@@ -300,11 +300,11 @@ c/xgboost4j/java/XGBoost.java#L208"))
                       ;;Adding in some defaults
                        (merge
                         {
-                        ;;  :alpha 0.0
-                        ;;  :eta 0.3
-                        ;;  :lambda 1.0
-                        ;;  :max-depth 6
-                        ;;  :subsample 0.87
+                          :alpha 0.0
+                          :eta 0.3
+                          :lambda 1.0
+                          :max-depth 6
+                          :subsample 0.87
                          
                          }
                         
@@ -314,6 +314,7 @@ c/xgboost4j/java/XGBoost.java#L208"))
                        (map (fn [[k v]]
                               (when v
                                 [(s/replace (name k) "-" "_" ) v])))
+
                        (remove nil?)
                        (into {}))
           ^"[[F" metrics-data (when-not (empty? watches)

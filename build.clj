@@ -3,10 +3,10 @@
   (:require [clojure.tools.build.api :as b] ; for b/git-count-revs
             [org.corfield.build :as bb]))
 
-(def lib ' scicloj/scicloj.ml.xgboost)
+(def lib 'org.scicloj/scicloj.ml.xgboost)
 ; alternatively, use MAJOR.MINOR.COMMITS:
 ;; (def version (format "7.0.%s" (b/git-count-revs nil)))
-(def version "6.0.0")
+(def version "6.1.0")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 (def jar-file (format "target/%s-%s.jar" (name lib) version))
