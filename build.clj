@@ -25,13 +25,23 @@
 (defn test "Run the tests." [opts]
   (bb/run-tests opts))
 
+(defn- pom-template []
+  [[:description "xgboost models for metamorph.ml and scicloj.ml"]
+   [:url "https://github.com/scicloj/scicloj.ml.xgboost"]
+   [:licenses
+    [:license
+     [:name "Eclipse Public License - v 2.0"]
+     [:url "https://www.eclipse.org/legal/epl-2.0/"]]]])
+
+
 (defn jar [_]
   (compile nil)
   (b/write-pom {:class-dir class-dir
                 :lib lib
                 :version version
                 :basis basis
-                :src-dirs ["src"]})
+                :src-dirs ["src"]
+                :pom-data  (pom-template)})
   (b/copy-dir {:src-dirs ["src" "resources"]
                :target-dir class-dir})
   (b/jar {:class-dir class-dir
@@ -41,7 +51,7 @@
   (-> opts
       (assoc :lib lib :version version
              :aliases [:run-tests])
-      (bb/run-tests)
+      (test)
       (bb/clean)
       (jar)))
 
