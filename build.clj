@@ -1,7 +1,8 @@
 (ns build
   (:refer-clojure :exclude [test])
   (:require [clojure.tools.build.api :as b] ; for b/git-count-revs
-            [org.corfield.build :as bb]))
+            [org.corfield.build :as bb]
+            [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'org.scicloj/scicloj.ml.xgboost)
 ; alternatively, use MAJOR.MINOR.COMMITS:
@@ -61,7 +62,23 @@
       (assoc :lib lib :version version)
       (bb/install)))
 
+;; (defn deploy "Deploy the JAR to Clojars." [opts]
+;;   (-> opts
+;;       (assoc :lib lib :version version)
+;;       (bb/deploy)))
+
+(defn- jar-opts [opts]
+  (assoc opts
+         :lib lib   :version version
+         :jar-file  (format "target/%s-%s.jar" lib version)
+         :basis     (b/create-basis {})
+         :class-dir class-dir
+         :target    "target"
+         :src-dirs  ["src"]
+         :pom-data  (pom-template)))
+
 (defn deploy "Deploy the JAR to Clojars." [opts]
-  (-> opts
-      (assoc :lib lib :version version)
-      (bb/deploy)))
+  (let [{:keys [jar-file] :as opts} (jar-opts opts)]
+    (dd/deploy {:installer :remote :artifact (b/resolve-path jar-file)
+                :pom-file (b/pom-path (select-keys opts [:lib :class-dir]))}))
+  opts)
