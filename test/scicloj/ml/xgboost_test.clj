@@ -9,12 +9,10 @@
             [scicloj.ml.smile.nlp :as nlp]
             [scicloj.ml.xgboost]
             [scicloj.metamorph.ml :as ml]
-            [scicloj.metamorph.ml.metrics :as metrics]
             [scicloj.metamorph.ml.loss :as loss]
             [scicloj.metamorph.ml.verify :as verify]
             [tech.v3.dataset.categorical :as ds-cat]
-            [scicloj.metamorph.ml.gridsearch :as ml-gs]
-            [scicloj.metamorph.ml.classification :as ml-class]))
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]))
 
             
 
@@ -184,66 +182,3 @@
 
     
 
-    (comment
-      ;; not working
-      (def reviews
-
-        (->
-         (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
-         (ds/select-columns [:Text :Score])
-         (nlp/count-vectorize :Text :bow nlp/default-text->bow)
-         (nb/bow->SparseArray :bow :bow-sparse  #(nlp/->vocabulary-top-n % 100))
-         (ds/drop-columns [:Text :bow])
-         (ds/update-column :Score
-                           (fn [col]
-                             (let [val-map {0 :c0
-                                            1 :c1
-                                            2 :c2
-                                            3 :c3
-                                            4 :c4
-                                            5 :c5}]
-                               (dtype/emap val-map :keyword col))))
-         (ds/categorical->number cf/categorical)
-         (ds-mod/set-inference-target :Score)))
-
-
-
-      (def feature-ds
-        (cf/feature reviews))
-
-      (def target-ds
-        (cf/target reviews))
-
-      (require '[scicloj.ml.xgboost])
-      (def d
-        (scicloj.ml.xgboost/sparse-feature->dmatrix 
-         feature-ds
-         target-ds
-         :bow-sparse
-         1000
-         ))
-      (def trained-model
-        (ml/train reviews {:model-type :xgboost/classification
-                           :sparse-column :bow-sparse
-                           :n-sparse-columns 1000
-                           ;:silent 0
-                           ;:round 1
-                           ;:eval-metric "merror"
-                           ;:watches {:test-ds (ds/sample  reviews 10)}
-                           }))
-
-
-
-      (def prediction
-        (:Score
-         (ml/predict reviews trained-model)))
-
-      (metrics/accuracy (:Score reviews) prediction)
-
-      (def folds
-        (ml/train-k-fold reviews {:model-type :xgboost/classification
-                                  :sparse-column :bow-sparse}))
-
-
-      (ml/explain folds)
-      )
