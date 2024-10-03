@@ -30,8 +30,8 @@
    [:url "https://github.com/scicloj/scicloj.ml.xgboost"]
    [:licenses
     [:license
-     [:name "Eclipse Public License - v 2.0"]
-     [:url "https://www.eclipse.org/legal/epl-2.0/"]]]])
+     [:name "Eclipse Public License - v 1.0"]
+     [:url "https://www.eclipse.org/legal/epl-1.0/"]]]])
 
 
 (defn jar [_]
