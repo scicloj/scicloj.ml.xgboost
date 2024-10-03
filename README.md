@@ -1,4 +1,5 @@
 [![Clojars Project](https://img.shields.io/clojars/v/scicloj/scicloj.ml.xgboost.svg)](https://clojars.org/scicloj/scicloj.ml.xgboost)
+[![Clojure CI](https://github.com/scicloj/scicloj.ml.xgboost/actions/workflows/ci.yml/badge.svg)](https://github.com/scicloj/scicloj.ml.xgboost/actions/workflows/ci.yml)
 
 # scicloj.ml.xgboost
 
