@@ -178,7 +178,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          #(hash-map :i  (.i ^SparseArray$Entry %) :x (.x ^SparseArray$Entry %))
          (iterator-seq
           (.iterator sparse)))]
-    (println :x-i-s (count x-i-s))
     (LabeledPoint. target
                    n-sparse-columns
                    (into-array Integer/TYPE (map :i x-i-s))

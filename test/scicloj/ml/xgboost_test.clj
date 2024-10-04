@@ -73,9 +73,20 @@
                            :sparse-column :bow-sparse
                            :n-sparse-columns 100})
 
-        _ (ml/explain model)]
-       (is true)))
-
+        
+        explanation (ml/explain model)
+        test-ds (ds/head reviews 100)
+        prediction (ml/predict test-ds model)
+        train-acc
+        (loss/classification-accuracy
+         (->
+          (ds-cat/reverse-map-categorical-xforms prediction)
+          :Score)
+         (-> test-ds
+             (ds-cat/reverse-map-categorical-xforms)
+             :Score))
+        ]
+       (is ( > train-acc 0.97))))
 
 
 (deftest iris 
@@ -103,7 +114,6 @@
   ds-cat/reverse-map-categorical-xforms
   (get "species")))]
 
-    (def model model)
     (is (= 0.9555555555555556 loss))
     
     (is (= 
