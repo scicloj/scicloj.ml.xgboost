@@ -10,7 +10,7 @@
 (def version "6.1.0")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
-(def jar-file (format "target/%s-%s.jar" (name lib) version))
+;;(def jar-file (format "target/%s-%s.jar" (name lib) version))
 
 
 
@@ -35,6 +35,17 @@
      [:url "https://www.eclipse.org/legal/epl-1.0/"]]]])
 
 
+(defn- jar-opts [opts]
+  (assoc opts
+         :lib lib   :version version
+         :jar-file  (format "target/%s-%s.jar" lib version)
+         :basis     (b/create-basis {})
+         :class-dir class-dir
+         :target    "target"
+         :src-dirs  ["src"]
+         :pom-data  (pom-template)))
+
+
 (defn jar [_]
   (compile nil)
   (b/write-pom {:class-dir class-dir
@@ -46,7 +57,7 @@
   (b/copy-dir {:src-dirs ["src" "resources"]
                :target-dir class-dir})
   (b/jar {:class-dir class-dir
-          :jar-file jar-file}))
+          :jar-file (:jar-file (jar-opts {}))}))
 
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
   (-> opts
@@ -67,15 +78,6 @@
 ;;       (assoc :lib lib :version version)
 ;;       (bb/deploy)))
 
-(defn- jar-opts [opts]
-  (assoc opts
-         :lib lib   :version version
-         :jar-file  (format "target/%s-%s.jar" lib version)
-         :basis     (b/create-basis {})
-         :class-dir class-dir
-         :target    "target"
-         :src-dirs  ["src"]
-         :pom-data  (pom-template)))
 
 (defn deploy "Deploy the JAR to Clojars." [opts]
   (let [{:keys [jar-file] :as opts} (jar-opts opts)]
