@@ -1,19 +1,24 @@
 (ns scicloj.ml.xgboost-test
   (:require [clojure.test :refer [deftest is]]
+            [fastmath.protocols :as protocols]
+            
+            [fastmath.vector :as vec]
+            [scicloj.metamorph.ml :as ml]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
+            [scicloj.metamorph.ml.loss :as loss]
+            [scicloj.metamorph.ml.verify :as verify]
+            [scicloj.ml.smile.discrete-nb :as nb]
+            [scicloj.ml.smile.nlp :as nlp]
+            [scicloj.ml.xgboost]
+            [tablecloth.api :as tc]
+            [tablecloth.column.api :as tcc]
             [tech.v3.dataset :as ds]
+            [tech.v3.dataset.categorical :as ds-cat]
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.functional :as dfn]
-            [scicloj.ml.smile.discrete-nb :as nb]
-            [scicloj.ml.smile.nlp :as nlp]
-            [scicloj.ml.xgboost]
-            [scicloj.metamorph.ml :as ml]
-            [scicloj.metamorph.ml.loss :as loss]
-            [scicloj.metamorph.ml.verify :as verify]
-            [tech.v3.dataset.categorical :as ds-cat]
-            [scicloj.metamorph.ml.gridsearch :as ml-gs]))
-
+            [tech.v3.datatype :as dt]))
 
 
 (deftest basic
@@ -25,7 +30,6 @@
                             :early-stopping-round 5
                             :round 50}
                            0.22))
-
 
 (deftest watches
   (let [{train-dataset :train-ds

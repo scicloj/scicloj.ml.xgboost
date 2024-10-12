@@ -8,357 +8,193 @@
             [scicloj.ml.xgboost :as xgboost]
             [scicloj.ml.xgboost.csr :as csr]
             [tablecloth.api :as tc]
-            [tablecloth.column.api :as tcc])
+            [tablecloth.column.api :as tcc]
+            [scicloj.metamorph.ml :as ml])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]
            [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
 
 
 
-
-(def ds
-  (->
-   (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
-                     (fn [line] 
-                       (let [splitted (first
-                                       (csv/read-csv line))]
-                         [(first splitted)
-                          (dec (Integer/parseInt (second splitted)))
-
-                          ])
-                       )
-                     #(str/split % #" ")
-                     :max-lines 10000
-                     :skip-lines 1     
-                     
-                     )
-   (tc/rename-columns {:meta :label})))
-
-
-
-(def ds
-  (tc/select-rows ds #(not (= "" (:word %)))))
-
-
-(def rnd-indexes
-  (-> (range 1000) (shuffle)))
-
-(def rnd-indexes-train
-  (take 800 rnd-indexes))
-
-
-(def rnd-indexes-test
-  (take-last 200 rnd-indexes))
-
-(def ds-train
-  (tc/left-join (tc/dataset {:document rnd-indexes-train}) ds [:document]))
-
-(def ds-test
-  (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document]))
-
-
-(def bow-train
-  (-> ds-train
-      text/->term-frequency
-      text/add-word-idx))
-
-
-
-(def zero-baseddocs-map-train
-  (zipmap
-   (-> bow-train :document distinct)
-   (range)))
-
-(def bow-train-zeroed
-  (-> bow-train
-      (tc/add-or-replace-column
-       :document
-       #(map zero-baseddocs-map-train (:document %)))))
-
-
-(def bow-test
-  (-> ds-test
-      text/->term-frequency
-      text/add-word-idx))
-
-(def zero-baseddocs-map-test
-  (zipmap
-   (-> bow-test :document distinct)
-   (range)))
-
-(def bow-test-zeroed
-  (-> bow-test
-      (tc/add-or-replace-column
-       :document
-       #(map zero-baseddocs-map-test (:document %)))))
-
-
-
-(def sparse-features-train
-  (-> bow-train-zeroed
-      (tc/select-columns [:document :word-idx :tf])
-      (tc/rows)))
-
-
-(def sparse-features-test
-  (-> bow-test-zeroed
-      (tc/select-columns [:document :word-idx :tf])
-      (tc/rows)))
-
-;(def n-rows (inc (apply tcc/max (bow :document))))
-(def n-col-train (inc (apply max  (bow-train-zeroed :word-idx))))
-(def n-col-test (inc (apply max  (bow-test-zeroed :word-idx))))
-
-(def csr-train
-  (csr/->csr sparse-features-train))
-
-(def csr-test
-  (csr/->csr sparse-features-test))
-
-
-
-(def labels-train
-  (->
-   bow-train-zeroed
-   (tc/group-by :document)
-   (tc/aggregate #(-> % :label first))
-   (tc/column "summary")))
-
-(def labels-test
-  
-  (->
-   bow-test-zeroed
-   (tc/group-by :document)
-   (tc/aggregate #(-> % :label first))
-   (tc/column "summary")))
-
-
-(def m-train
-  (DMatrix.
-   (long-array (:row-pointers csr-train))
-   (int-array (:column-indices csr-train))
-   (float-array (:values csr-train))
-   DMatrix$SparseType/CSR
-   n-col-train))
-(.setLabel m-train (float-array labels-train))
-
-(def m-test
-  (DMatrix.
-   (long-array (:row-pointers csr-test))
-   (int-array (:column-indices csr-test))
-   (float-array (:values csr-test))
-   DMatrix$SparseType/CSR
-   n-col-test))
-(.setLabel m-test (float-array labels-test))
-
-
-
-
-(def model
-  (xgboost/train-from-dmatrix
-   m-train
-   ["word"]
-   ["label"]
-   {:num-class 5}
-   {}
-   "multi:softmax"))
-
-
-
-(def booster
-  (XGBoost/loadModel
-   (java.io.ByteArrayInputStream. (:model-data model))))
-
-(def predition-train
-  (->>
-   (.predict booster m-train)
-   (map #(int (first %)))))
-
-(def predition-test
-  (->>
-   (.predict booster m-test)
-   (map #(int (first %)))))
-
-
-
-(def train-accuracy
-  (loss/classification-accuracy
-   (vec predition-train)
-   (vec labels-train)))
-
-(def test-accuracy
-  (loss/classification-accuracy
-   (vec predition-test)
-   (vec labels-test)))
-
-
 (deftest reviews-accuracy-sparse-matrix-classification
-  (is (< 0.95 train-accuracy))
-  (is (< 0.54 test-accuracy)))
+  (let [ds
+        (->
+         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                            (fn [line]
+                              (let [splitted (first
+                                              (csv/read-csv line))]
+                                [(first splitted)
+                                 (dec (Integer/parseInt (second splitted)))]))
+                            #(str/split % #" ")
+                            :max-lines 10000
+                            :skip-lines 1)
+         (tc/rename-columns {:meta :label})
+         (tc/drop-rows #(= "" (:word %)))
+         (tc/drop-missing))
 
-;;=> 0.973
+        rnd-indexes (-> (range 1000) (shuffle))
+        rnd-indexes-train  (take 800 rnd-indexes)
+        rnd-indexes-test (take-last 200 rnd-indexes)
 
-;;------------------------------
+        ds-train (tc/left-join (tc/dataset {:document rnd-indexes-train}) ds [:document])
+        ds-test (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document])
 
-(comment
+        bow-train
+        (-> ds-train
+            text/->term-frequency
+            text/add-word-idx)
+        bow-test
+        (-> ds-test
+            text/->term-frequency
+            text/add-word-idx)
 
-  (def result
-    (text/->tidy-text "test/data/small_text.csv"
-                      (fn [line]
-                        (let [splitted (first
-                                        (csv/read-csv line))]
-                          (vector
-                           (first splitted)
-                           (dec (Integer/parseInt (second splitted))))))
-                      :max-lines 10000
-                      :skip-lines 1))
-  
+        m-train (xgboost/tidy-text-bow-ds->dmatrix bow-train)
+        m-test (xgboost/tidy-text-bow-ds->dmatrix bow-test)
 
+        model
+        (xgboost/train-from-dmatrix
+         m-train
+         ["word"]
+         ["label"]
+         {:num-class 5}
+         {}
+         "multi:softmax")
 
-  (def ds (:ds result))
-  
-  (def st (:st result))
+        booster
+        (XGBoost/loadModel
+         (java.io.ByteArrayInputStream. (:model-data model)))
 
-  ds
-  
-;;=> _unnamed [12 4]:
-;;   
-;;   | :word | :word-index | :document | :label |
-;;   |-------|------------:|----------:|-------:|
-;;   |     I |           0 |         0 |      0 |
-;;   |  like |           1 |         0 |      0 |
-;;   |  fish |           2 |         0 |      0 |
-;;   |   and |           3 |         0 |      0 |
-;;   |   you |           4 |         0 |      0 |
-;;   |   the |           5 |         0 |      0 |
-;;   |  fish |           6 |         0 |      0 |
-;;   |    Do |           0 |         1 |      1 |
-;;   |   you |           1 |         1 |      1 |
-;;   |  like |           2 |         1 |      1 |
-;;   |    me |           3 |         1 |      1 |
-;;   |     ? |           4 |         1 |      1 |
-;;   
-  
-  (def bow
-    (-> ds
-        text/->term-frequency
-        text/add-word-idx))
+        predition-train
+        (->>
+         (.predict booster m-train)
+         (map #(int (first %))))
 
-  bow
-  
-;;=> _unnamed [11 5]:
-;;   
-;;   | :word | :document | :label | :tf | :word-idx |
-;;   |-------|----------:|-------:|----:|----------:|
-;;   |     I |         0 |      0 |   1 |         1 |
-;;   |  like |         0 |      0 |   1 |         2 |
-;;   |  fish |         0 |      0 |   2 |         3 |
-;;   |   and |         0 |      0 |   1 |         4 |
-;;   |   you |         0 |      0 |   1 |         5 |
-;;   |   the |         0 |      0 |   1 |         6 |
-;;   |    Do |         1 |      1 |   1 |         7 |
-;;   |   you |         1 |      1 |   1 |         5 |
-;;   |  like |         1 |      1 |   1 |         2 |
-;;   |    me |         1 |      1 |   1 |         8 |
-;;   |     ? |         1 |      1 |   1 |         9 |
-;;   
-  
-  st
+        predition-test
+        (->>
+         (.predict booster m-test)
+         (map #(int (first %))))
 
+        train-accuracy
+        (loss/classification-accuracy
+         (float-array predition-train)
+         (.getLabel m-train))
 
-  (def sparse-features
-    (-> bow
-        (tc/select-columns [:document :word-idx :tf])
-        (tc/rows)))
-  
-     ;;=> [[0 1 1] [0 2 1] [0 3 2] [0 4 1] [0 5 1] [0 6 1] [1 7 1] [1 5 1] [1 2 1] [1 8 1] [1 9 1]]
-  
+        test-accuracy
+        (loss/classification-accuracy
+         (float-array predition-test)
+         (.getLabel m-test))]
 
-  (def n-rows (inc (apply tcc/max (bow :document))))
-  
-  n-rows
-;;=> 2
-  
-  (def n-col (inc (apply max  (bow :word-idx))))
-  
-  n-col
-  
-;;=> 10
-  
-  (def csr
-    (csr/->csr sparse-features))
-
-  (def dense
-    (csr/->dense csr n-rows n-col))
-;;     0 1 2 3 4 5 6 7 8 9   
-;;=> ((0 1 1 2 1 1 1 0 0 0)     ; I like fish fish and you the
-;;    (0 0 1 0 0 1 0 1 1 1))    ; like you do me ? 
-  
-  bow
-  
-;;=> _unnamed [11 5]:
-;;   
-;;   | :word | :document | :label | :tf | :word-idx |
-;;   |-------|----------:|-------:|----:|----------:|
-;;   |     I |         0 |      0 |   1 |         1 |
-;;   |  like |         0 |      0 |   1 |         2 |
-;;   |  fish |         0 |      0 |   2 |         3 |
-;;   |   and |         0 |      0 |   1 |         4 |
-;;   |   you |         0 |      0 |   1 |         5 |
-;;   |   the |         0 |      0 |   1 |         6 |
-;;   |    Do |         1 |      1 |   1 |         7 |
-;;   |   you |         1 |      1 |   1 |         5 |
-;;   |  like |         1 |      1 |   1 |         2 |
-;;   |    me |         1 |      1 |   1 |         8 |
-;;   |     ? |         1 |      1 |   1 |         9 |
-;;   
-  
-
-  (def labels
-    (->
-     bow
-     (tc/group-by :document)
-     (tc/aggregate #(-> % :label first))
-     (tc/column "summary")))
-  labels
-  
-;;=> #tech.v3.dataset.column<int64>[2]
-;;   summary
-;;   [0, 1]
-  
-
-
-  (def m
-    (DMatrix.
-     (long-array (:row-pointers csr))
-     (int-array (:column-indices csr))
-     (float-array (:values csr))
-     DMatrix$SparseType/CSR
-     n-col))
-  (.setLabel m (float-array labels))
-  
+    (is (< 0.95 train-accuracy))
+    (is (< 0.54 test-accuracy))))
 
 
 
-  (def model
-    (xgboost/train-from-dmatrix
-     m
-     ["word"]
-     ["label"]
-     {:num-class 2}
-     {}
-     "multi:softprob"))
-  
 
 
-  (def booster
-    (XGBoost/loadModel
-     (java.io.ByteArrayInputStream. (:model-data model))))
+(deftest small-text
+
+  (let [ds
+        (->
+         (text/->tidy-text (io/reader "test/data/small_text.csv")
+                           (fn [line]
+                             (let [splitted (first
+                                             (csv/read-csv line))]
+                               (vector
+                                (first splitted)
+                                (dec (Integer/parseInt (second splitted))))))
+                           #(str/split % #" ")
+                           :max-lines 10000
+                           :skip-lines 1)
+         (tc/rename-columns {:meta :label}))
+
+
+
+        bow
+        (-> ds
+            text/->term-frequency
+            text/add-word-idx)
+
+
+        sparse-features
+        (-> bow
+            (tc/select-columns [:document :word-idx :tf])
+            (tc/rows))
+
+
+        n-rows (inc (apply tcc/max (bow :document)))
+
+
+        n-col (inc (apply max  (bow :word-idx)))
+
+
+
+        csr
+        (csr/->csr sparse-features)
+
+        dense
+        (csr/->dense csr n-rows n-col)
+
+
+        labels
+        (->
+         bow
+         (tc/group-by :document)
+         (tc/aggregate #(-> % :label first))
+         (tc/column "summary"))
+
+        m
+        (DMatrix.
+         (long-array (:row-pointers csr))
+         (int-array (:column-indices csr))
+         (float-array (:values csr))
+         DMatrix$SparseType/CSR
+         n-col)
+        _ (.setLabel m (float-array labels))
+
+
+        model
+        (xgboost/train-from-dmatrix
+         m
+         ["word"]
+         ["label"]
+         {:num-class 2}
+         {}
+         "multi:softprob")
+
+        booster
+        (XGBoost/loadModel
+         (java.io.ByteArrayInputStream. (:model-data model)))
+
+        predition
+        (.predict booster m)]
+
+    (is (= ["I", "like", "fish", "and", "you", "the", "fish", "Do", "you", "like", "me", "?"]
+           (:word ds)))
+
+
+    (is (= [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4] (ds :word-index)))
+
+    (is (= [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :document)))
+
+    (is (=  [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :label)))
+
+    (is (= [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
+           (:tf bow)))
+
+
+    (is (= [[0 1 1] [0 2 1] [0 3 2] [0 4 1] [0 5 1] [0 6 1] [1 7 1] [1 5 1] [1 2 1] [1 8 1] [1 9 1]]
+           sparse-features))
+
+    (is (= 2 n-rows))
+    (is (= 10 n-col))
+    (is (= [[0 1.0 1.0 2.0 1.0 1.0 1.0 0 0 0]
+            [0 0 1.0 0 0 1.0 0 1.0 1.0 1.0]]
+           dense))
+    (is (= [0 1] labels))
+
+    (is (= [[0.5, 0.5], [0.5, 0.5]]
+           (map seq predition)))))
   
-  (def predition
-    (.predict booster m))
-  predition
-  )
 
 
 

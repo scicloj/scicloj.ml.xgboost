@@ -2,24 +2,26 @@
   "Require this namespace to get xgboost support for classification and regression.
   Defines a full range of xgboost model definitions and supports xgboost explain
   functionality."
-  (:require [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.errors :as errors]
-            [scicloj.metamorph.ml :as ml]
-            [scicloj.ml.xgboost.model :as model]
-            [scicloj.metamorph.ml.gridsearch :as ml-gs]
-            [tech.v3.dataset :as ds]
-            [tech.v3.dataset.tensor :as ds-tens]
-            [tech.v3.dataset.modelling :as ds-mod]
-            [tech.v3.dataset.utils :as ds-utils]
-            [tech.v3.tensor :as dtt]
-            [clojure.set :as set]
+  (:require [clojure.set :as set]
             [clojure.string :as s]
-            [clojure.tools.logging :as log])
-  (:import [ml.dmlc.xgboost4j.java Booster XGBoost  DMatrix]
-           [ml.dmlc.xgboost4j LabeledPoint]
-           [smile.util SparseArray SparseArray$Entry]
+            [clojure.tools.logging :as log]
+            [scicloj.metamorph.ml :as ml]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
+            [scicloj.ml.xgboost.model :as model]
+            [tablecloth.api :as tc]
+            [tech.v3.dataset :as ds]
+            [tech.v3.dataset.modelling :as ds-mod]
+            [tech.v3.dataset.tensor :as ds-tens]
+            [tech.v3.dataset.utils :as ds-utils]
+            [tech.v3.datatype :as dtype]
+            [tech.v3.datatype.errors :as errors]
+            [tech.v3.tensor :as dtt]
+            [scicloj.ml.xgboost.csr :as csr])
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
-           [java.io ByteArrayInputStream ByteArrayOutputStream]))
+           [ml.dmlc.xgboost4j LabeledPoint]
+           [ml.dmlc.xgboost4j.java Booster DMatrix XGBoost DMatrix$SparseType]
+           [smile.util SparseArray SparseArray$Entry]))
 
 
 
@@ -183,7 +185,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                    (into-array Integer/TYPE (map :i x-i-s))
                    (into-array Float/TYPE (map :x x-i-s)))))
 
-(defn sparse-feature->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
+(defn sparse-feature->dmatrix 
+  "converts columns containing smile.util.SparseArray to a sparse dmatrix"
+  [feature-ds target-ds sparse-column n-sparse-columns]
   (DMatrix.
    (.iterator
     ^Iterable (map
@@ -193,6 +197,41 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                     (repeat 0.0))))
    nil))
 
+
+(defn tidy-text-bow-ds->dmatrix [bow]
+  (let [zero-baseddocs-map
+        (zipmap
+         (-> bow :document distinct)
+         (range))
+        bow-zeroed
+        (-> bow
+            (tc/add-or-replace-column
+             :document
+             #(map zero-baseddocs-map (:document %))))
+        sparse-features
+        (-> bow-zeroed
+            (tc/select-columns [:document :word-idx :tf])
+            (tc/rows))
+        n-col (inc (apply max  (bow-zeroed :word-idx)))
+
+        csr
+        (csr/->csr sparse-features)
+
+        labels
+        (->
+         bow-zeroed
+         (tc/group-by :document)
+         (tc/aggregate #(-> % :label first))
+         (tc/column "summary"))
+        m
+        (DMatrix.
+         (long-array (:row-pointers csr))
+         (int-array (:column-indices csr))
+         (float-array (:values csr))
+         DMatrix$SparseType/CSR
+         n-col)]
+    (.setLabel m (float-array labels))
+    m))
 
 
 (defn- dataset->labeled-point-iterator
@@ -324,7 +363,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                 (->> (repeatedly (count watches)
                                                  #(float-array round))
                                      (into-array)))
-          _ (println :params params)
           ^Booster model (XGBoost/train train-dmat params
                                         (long round)
                                         (or watches {}) metrics-data nil nil
