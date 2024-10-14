@@ -17,6 +17,12 @@
            [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
 
 
+(defn deterministic-shuffle
+  [^java.util.Collection coll seed]
+  (let [al (java.util.ArrayList. coll)
+        rng (java.util.Random. seed)]
+    (java.util.Collections/shuffle al rng)
+    (clojure.lang.RT/vector (.toArray al))))
 
 (deftest reviews-accuracy-sparse-matrix-classification
   (let [ds
@@ -34,7 +40,7 @@
          (tc/drop-rows #(= "" (:word %)))
          (tc/drop-missing))
 
-        rnd-indexes (-> (range 1000) (shuffle))
+        rnd-indexes (-> (range 1000) (deterministic-shuffle 123))
         rnd-indexes-train  (take 800 rnd-indexes)
         rnd-indexes-test (take-last 200 rnd-indexes)
 
@@ -60,7 +66,10 @@
          m-train
          ["word"]
          ["label"]
-         {:num-class 5}
+         {:num-class 5
+          :validate-parameters "true"
+          :seed 123
+          :verbosity 0}
          {}
          "multi:softmax")
 

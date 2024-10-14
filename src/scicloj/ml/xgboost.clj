@@ -210,6 +210,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
         bow (text/add-word-idx ds)
+        _ (def bow bow)
+
         zero-baseddocs-map
         (zipmap
          (-> bow :document distinct)
