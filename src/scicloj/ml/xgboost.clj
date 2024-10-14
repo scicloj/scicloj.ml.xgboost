@@ -16,7 +16,8 @@
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
             [tech.v3.tensor :as dtt]
-            [scicloj.ml.xgboost.csr :as csr])
+            [scicloj.ml.xgboost.csr :as csr]
+            [scicloj.metamorph.ml.text :as text])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
            [ml.dmlc.xgboost4j LabeledPoint]
@@ -198,8 +199,18 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    nil))
 
 
-(defn tidy-text-bow-ds->dmatrix [bow]
-  (let [zero-baseddocs-map
+(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds]
+  (def feature-ds feature-ds)
+  (def target-ds target-ds)
+
+  ;(-> feature-ds :word .data .data)
+  ;(:label target-ds)
+
+  (let [ds (if (some? target-ds)
+             (assoc feature-ds :label (:label target-ds))
+             feature-ds)
+        bow (text/add-word-idx ds)
+        zero-baseddocs-map
         (zipmap
          (-> bow :document distinct)
          (range))
@@ -230,7 +241,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)]
-    (.setLabel m (float-array labels))
+    (def labels labels)
+    (when target-ds
+      (.setLabel m (float-array labels)))
     m))
 
 
@@ -287,8 +300,15 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 (defn ->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
   (if sparse-column
-    (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+    (if (= (-> feature-ds (get sparse-column) first class)
+           SparseArray)
+      (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+      (tidy-text-bow-ds->dmatrix feature-ds target-ds)
+      
+      )
+       
     (dataset->dmatrix feature-ds target-ds)))
+
 
 
 
@@ -393,12 +413,12 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                     (ds-mod/inference-target-label-map label-ds))]
     (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
 
-
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
   (let [sparse-column-or-nil (:sparse-column options)
         dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
         prediction (.predict ^Booster thawed-model dmatrix)
+
         predict-tensor (->> prediction
                             (dtt/->tensor))
         target-cname (first target-columns)]
@@ -407,17 +427,15 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (if (multiclass-objective? (options->objective options))
       (->
        (model/finalize-classification predict-tensor
-                                      (ds/row-count feature-ds)
                                       target-cname
                                       target-categorical-maps)
 
-       (tech.v3.dataset.modelling/probability-distributions->label-column
-        (first target-columns))
+       (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
        (ds/update-column (first  target-columns)
                          #(vary-meta % assoc :column-type :prediction)))
       (model/finalize-regression predict-tensor target-cname))))
 
-    
+
 
 
 (defn- explain

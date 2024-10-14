@@ -1,5 +1,9 @@
 # ConstantChangeLog
 
+## unreleased
+- fixed issue #1
+
+
 ## 6.1.0
 
 Upgrade to xgboost4j_2.12 2.1.1

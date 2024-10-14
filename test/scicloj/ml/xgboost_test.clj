@@ -1,24 +1,24 @@
 (ns scicloj.ml.xgboost-test
-  (:require [clojure.test :refer [deftest is]]
-            [fastmath.protocols :as protocols]
-            
-            [fastmath.vector :as vec]
+  (:require [clojure.data.csv :as csv]
+            [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
             [scicloj.metamorph.ml :as ml]
             [scicloj.metamorph.ml.gridsearch :as ml-gs]
             [scicloj.metamorph.ml.loss :as loss]
+            [scicloj.metamorph.ml.text :as text]
             [scicloj.metamorph.ml.verify :as verify]
             [scicloj.ml.smile.discrete-nb :as nb]
             [scicloj.ml.smile.nlp :as nlp]
             [scicloj.ml.xgboost]
             [tablecloth.api :as tc]
-            [tablecloth.column.api :as tcc]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.categorical :as ds-cat]
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
-            [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.functional :as dfn]
-            [tech.v3.datatype :as dt]))
+            [tech.v3.datatype :as dtype] 
+            [tech.v3.datatype.functional :as dfn])
+  (:import [java.util.zip GZIPInputStream]))
 
 
 (deftest basic
@@ -77,7 +77,7 @@
                            :sparse-column :bow-sparse
                            :n-sparse-columns 100})
 
-        
+
         explanation (ml/explain model)
         test-ds (ds/head reviews 100)
         prediction (ml/predict test-ds model)
@@ -88,13 +88,12 @@
           :Score)
          (-> test-ds
              (ds-cat/reverse-map-categorical-xforms)
-             :Score))
-        ]
-       (is ( > train-acc 0.97))))
+             :Score))]
+    (is (> train-acc 0.97))))
 
 
-(deftest iris 
-  (let [ src-ds (ds/->dataset "test/data/iris.csv")
+(deftest iris
+  (let [src-ds (ds/->dataset "test/data/iris.csv")
         ds (->  src-ds
                 (ds/categorical->number cf/categorical)
                 (ds-mod/set-inference-target "species"))
@@ -104,7 +103,7 @@
         test-ds (:test-ds split-data)
         model (ml/train train-ds {:validate-parameters "true"
                                   :seed 123
-                                  :verbosity 1
+                                  :verbosity 0
                                   :model-type :xgboost/classification})
         predictions (ml/predict test-ds model)
         loss

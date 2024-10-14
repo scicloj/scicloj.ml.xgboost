@@ -9,7 +9,9 @@
             [scicloj.ml.xgboost.csr :as csr]
             [tablecloth.api :as tc]
             [tablecloth.column.api :as tcc]
-            [scicloj.metamorph.ml :as ml])
+            [scicloj.metamorph.ml :as ml]
+            [tech.v3.dataset.column-filters :as cf]
+            [tech.v3.dataset :as ds])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]
            [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
@@ -26,7 +28,7 @@
                                 [(first splitted)
                                  (dec (Integer/parseInt (second splitted)))]))
                             #(str/split % #" ")
-                            :max-lines 10000
+                            :max-lines 1000
                             :skip-lines 1)
          (tc/rename-columns {:meta :label})
          (tc/drop-rows #(= "" (:word %)))
@@ -48,8 +50,10 @@
             text/->term-frequency
             text/add-word-idx)
 
-        m-train (xgboost/tidy-text-bow-ds->dmatrix bow-train)
-        m-test (xgboost/tidy-text-bow-ds->dmatrix bow-test)
+        m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train) 
+                                                   (tc/select-columns bow-train [:label]) )
+        m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test) 
+                                                  (tc/select-columns bow-test [:label]))
 
         model
         (xgboost/train-from-dmatrix
@@ -83,6 +87,9 @@
         (loss/classification-accuracy
          (float-array predition-test)
          (.getLabel m-test))]
+
+    (println :train-accuracy train-accuracy)
+    (println :test-accuracy test-accuracy)
 
     (is (< 0.95 train-accuracy))
     (is (< 0.54 test-accuracy))))
