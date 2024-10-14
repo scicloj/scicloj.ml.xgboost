@@ -194,33 +194,47 @@
            (-> models first :accuracy (* 100) Math/round)))))
 
 
-(deftest no-cat-not-working 
-; https://github.com/scicloj/scicloj.ml.xgboost/issues/1
-  (let [ iris-no-cat-map
-        (->
-         (ds/->dataset "test/data/iris.csv" {:key-fn keyword})
-         (ds/categorical->number [:species] {} :float64)
-         (ds-mod/set-inference-target [:species])
-         (ds/assoc-metadata [:species] :categorical-map nil))
-        
-        model
-        (ml/train iris-no-cat-map {:model-type :xgboost/classification
-                                   :num-class 3})]
-    (is ( = []  
-          (:species (ml/predict iris-no-cat-map model)))))) 
-
-
-(deftest no-cat-craching
-; https://github.com/scicloj/scicloj.ml.xgboost/issues/1
+(deftest no-cat
   (let [iris-no-cat-map
         (->
          (ds/->dataset "test/data/iris.csv" {:key-fn keyword})
          (ds/categorical->number [:species] {} :float64)
          (ds-mod/set-inference-target [:species])
-         (ds/assoc-metadata [:species] :categorical-map nil))]
+         (ds/assoc-metadata [:species] :categorical-map nil))
 
-    (is ( thrown? Exception 
-          (ml/train iris-no-cat-map {:model-type :xgboost/classification
-                                     })))
-    )) 
+        model
+        (ml/train iris-no-cat-map {:model-type :xgboost/classification
+                                   :num-class 3})]
+    (is (= [ 0.0 2.0 1.0]
+            (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
 
+
+(comment
+  (def reviews
+    (->
+     (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                        (fn [line]
+                          (let [splitted (first
+                                          (csv/read-csv line))]
+                            [(first splitted)
+                             (dec (Integer/parseInt (second splitted)))]))
+                        #(str/split % #" ")
+                        :max-lines 10000
+                        :skip-lines 1)
+     (tc/rename-columns {:meta :label})
+     (tc/drop-rows #(= "" (:word %)))
+     (tc/drop-missing)
+     (text/->term-frequency)
+     (ds-mod/set-inference-target [:label])))
+  
+
+
+  (def model
+    (ml/train reviews {:model-type :xgboost/classification
+                       :sparse-column :tf
+                       :num-class 5}))
+  
+  
+
+  (ml/predict reviews model)
+  )

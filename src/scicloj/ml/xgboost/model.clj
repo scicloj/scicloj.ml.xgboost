@@ -2,6 +2,7 @@
   "Internal namespace of helper functions used to implement models."
   (:require [tech.v3.datatype :as dtype]
             [tech.v3.tensor :as dtt]
+            [tech.v3.datatype :as dt]
             [tech.v3.dataset.tensor :as ds-tens]
             [tech.v3.dataset :as ds]
             [clojure.set :as set]))
@@ -26,13 +27,15 @@
   ;; attention: this function might be smile specific
   ;; it assumes a certain relation in the order of prediction probbalilities in `cls-tens`
   ;; and teh categoricla map
+  
+  [cls-tens target-cname target-categorical-maps]
 
-  [cls-tens n-rows target-cname target-categorical-maps]
   (let [rename-map (-> (get-in target-categorical-maps
                                [target-cname :lookup-table])
                        (set/map-invert))
-        n-cols (count rename-map)]
-    (-> (dtt/reshape cls-tens [n-rows n-cols])
+        ;n-cols (count rename-map)
+        ]
+    (-> (dtt/reshape cls-tens (dt/shape cls-tens))
         (ds-tens/tensor->dataset)
         (ds/rename-columns rename-map)
         (ds/update-columnwise :all vary-meta assoc
