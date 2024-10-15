@@ -50,70 +50,17 @@
         ds-train (tc/left-join (tc/dataset {:document rnd-indexes-train}) ds [:document])
         ds-test (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document])
 
-        _ (def ds-train ds-train)
-        bow-train-old
-        (-> ds-train
-            text/->term-frequency-old
-            text/add-word-idx)
-
-        bow-train-new
+        bow-train
         (-> ds-train
             text/->term-frequency
             text/add-word-idx)
 
-
-
-        bow-test-old
-        (-> ds-test
-            text/->term-frequency-old
-            text/add-word-idx)
-
-        bow-test-new
+        bow-test
         (-> ds-test
             text/->term-frequency-old
             text/add-word-idx)
 
 
-        _ (def bow-train-old bow-train-old)
-        _ (def bow-train-new bow-train-new)
-
-        _
-        (=
-         (-> bow-train-old :document)
-         (-> bow-train-new :document))
-
-        _
-        (=
-         (apply + (take 1000 (-> bow-train-old :term-count)))
-         (apply + (take 1000 (-> bow-train-new :term-count))))
-
-        _
-        (=
-         (-> bow-train-old :term-idx)
-         (-> bow-train-new :term-idx))
-
-        _
-        (=
-         (-> bow-train-old
-             (tc/group-by :document)
-             (tc/aggregate #(-> % :label first)))
-         (-> bow-train-new
-             (tc/group-by :document)
-             (tc/aggregate #(-> % :label first))))
-
-        _
-        (-> bow-train-old
-            (tc/select-columns [:document :term-idx :term-count])
-            (tc/order-by [:document :term-idx :term-count]))
-
-        _
-        (-> bow-train-new
-            (tc/select-columns [:document :term-idx :term-count])
-            (tc/order-by [:document :term-idx :term-count]))
-
-
-        bow-train bow-train-new
-        bow-test bow-test-new
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
                                                    (tc/select-columns bow-train [:label]))
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
