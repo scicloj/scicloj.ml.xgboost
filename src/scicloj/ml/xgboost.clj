@@ -16,8 +16,7 @@
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
             [tech.v3.tensor :as dtt]
-            [scicloj.ml.xgboost.csr :as csr]
-            [scicloj.metamorph.ml.text :as text])
+            [scicloj.ml.xgboost.csr :as csr])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
            [ml.dmlc.xgboost4j LabeledPoint]
@@ -199,43 +198,28 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    nil))
 
 
-(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds]
-  (def feature-ds feature-ds)
-  (def target-ds target-ds)
-
-  ;(-> feature-ds :word .data .data)
-  ;(:label target-ds)
-
+(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column]
   (let [ds (if (some? target-ds)
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
-        bow (text/add-word-idx ds)
-        _ (def bow bow)
 
         zero-baseddocs-map
         (zipmap
-         (-> bow :document distinct)
+         (-> ds :document distinct)
          (range))
-        
-        _ (def zero-baseddocs-map zero-baseddocs-map) 
         bow-zeroed
-        (-> bow
+        (-> ds
             (tc/add-or-replace-column
              :document
              #(map zero-baseddocs-map (:document %))))
-        
-        _ (def bow-zeroed bow-zeroed)
         sparse-features
         (-> bow-zeroed
-            (tc/select-columns [:document :term-idx :term-count])
+            (tc/select-columns [:document :term-idx text-feature-column])
             (tc/rows))
         
-        _ (def sparse-features sparse-features)
         n-col (inc (apply max  (bow-zeroed :term-idx)))
 
-        
-        csr
-        (csr/->csr sparse-features)
+        csr  (csr/->csr sparse-features)
 
         labels
         (->
@@ -250,7 +234,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)]
-    (def labels labels)
     (when target-ds
       (.setLabel m (float-array labels)))
     m))
@@ -312,7 +295,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (if (= (-> feature-ds (get sparse-column) first class)
            SparseArray)
       (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-      (tidy-text-bow-ds->dmatrix feature-ds target-ds)
+      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column)
       
       )
        

@@ -2,7 +2,6 @@
   "Internal namespace of helper functions used to implement models."
   (:require [tech.v3.datatype :as dtype]
             [tech.v3.tensor :as dtt]
-            [tech.v3.datatype :as dt]
             [tech.v3.dataset.tensor :as ds-tens]
             [tech.v3.dataset :as ds]
             [clojure.set :as set]))
@@ -35,7 +34,7 @@
                        (set/map-invert))
         ;n-cols (count rename-map)
         ]
-    (-> (dtt/reshape cls-tens (dt/shape cls-tens))
+    (-> (dtt/reshape cls-tens (dtype/shape cls-tens))
         (ds-tens/tensor->dataset)
         (ds/rename-columns rename-map)
         (ds/update-columnwise :all vary-meta assoc

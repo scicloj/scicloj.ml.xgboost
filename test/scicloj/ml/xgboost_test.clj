@@ -208,32 +208,44 @@
             (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
 
 
-(comment
-  (def reviews
-    (->
-     (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
-                        (fn [line]
-                          (let [splitted (first
-                                          (csv/read-csv line))]
-                            [(first splitted)
-                             (dec (Integer/parseInt (second splitted)))]))
-                        #(str/split % #" ")
-                        :max-lines 10000
-                        :skip-lines 1)
-     (tc/rename-columns {:meta :label})
-     (tc/drop-rows #(= "" (:word %)))
-     (tc/drop-missing)
-     (text/->term-frequency)
-     (ds-mod/set-inference-target [:label])))
-  
+(deftest tidy-text-train
+  (let [ reviews
+        (->
+         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                            (fn [line]
+                              (let [splitted (first
+                                              (csv/read-csv line))]
+                                [(first splitted)
+                                 (dec (Integer/parseInt (second splitted)))]))
+                            #(str/split % #" ")
+                            :max-lines 10000
+                            :skip-lines 1)
+         
+         (tc/rename-columns {:meta :label})
+         (tc/drop-rows #(= "" (:term %)))
+         (tc/drop-missing)
+         (text/->term-frequency)
+         (ds-mod/set-inference-target [:label]))
+        model
+        (ml/train reviews {:model-type :xgboost/classification
+                           :sparse-column :term-count
+                           :seed 123
+                           :num-class 5})
+        prediction (ml/predict reviews model)
+        
+        expected
+        (-> reviews
+            (tc/select-columns [:document :label])
+            (tc/unique-by [:document :label])
+            :label
+            )]
 
-
-  (def model
-    (ml/train reviews {:model-type :xgboost/classification
-                       :sparse-column :tf
-                       :num-class 5}))
-  
-  
-
-  (ml/predict reviews model)
+    (is ( < 0.95
+          (loss/classification-accuracy
+           expected
+           (-> prediction
+               (ds-cat/reverse-map-categorical-xforms)
+               :label)
+           )))
   )
+)

@@ -4,7 +4,7 @@
   ml.dmlc/xgboost4j_2.12            {:mvn/version "2.1.1"}
   ;ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "2.1.1"} ;; what for ??
   org.scicloj/metamorph.ml          {:git/url "https://github.com/scicloj/metamorph.ml"
-                                     :git/sha "6b2e634ac167651c3f5f0eda59f096a25796d32d"
+                                     :git/sha "523e1d40d77959973cb3c5687eeff3b945a21818"
 }
   ;{:mvn/version "0.9.0"}
 

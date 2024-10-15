@@ -9,10 +9,7 @@
             [scicloj.ml.xgboost.csr :as csr]
             [tablecloth.api :as tc]
             [tablecloth.column.api :as tcc]
-            [scicloj.metamorph.ml :as ml]
-            [tech.v3.dataset.column-filters :as cf]
-            [tech.v3.dataset.base :as ds-base]
-            [tech.v3.dataset.impl.dataset :as ds-impl])
+            [tech.v3.dataset.column-filters :as cf])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]
            [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
@@ -39,9 +36,7 @@
                             :skip-lines 1)
          (tc/rename-columns {:meta :label})
          (tc/drop-rows #(= "" (:term %)))
-         (tc/drop-missing)
-         (tc/order-by [:document :term-idx])
-         (ds-base/ensure-dataset-string-tables))
+         (tc/drop-missing))
 
         rnd-indexes (-> (range 1000) (deterministic-shuffle 123))
         rnd-indexes-train  (take 800 rnd-indexes)
@@ -53,18 +48,20 @@
         bow-train
         (-> ds-train
             text/->term-frequency
-            text/add-word-idx)
+            )
 
         bow-test
         (-> ds-test
-            text/->term-frequency-old
-            text/add-word-idx)
+            text/->term-frequency
+            )
 
 
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
-                                                   (tc/select-columns bow-train [:label]))
+                                                   (tc/select-columns bow-train [:label])
+                                                   :tfidf)
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
-                                                  (tc/select-columns bow-test [:label]))
+                                                  (tc/select-columns bow-test [:label])
+                                                  :tfidf)
 
         model
         (xgboost/train-from-dmatrix
@@ -128,12 +125,8 @@
                            :skip-lines 1)
          (tc/rename-columns {:meta :label}))
 
-
-
         bow
-        (-> ds
-            text/->term-frequency
-            text/add-word-idx)
+        (-> ds text/->term-frequency)
 
 
         sparse-features
@@ -141,13 +134,8 @@
             (tc/select-columns [:document :term-idx :term-count])
             (tc/rows))
 
-
         n-rows (inc (apply tcc/max (bow :document)))
-
-
         n-col (inc (apply max  (bow :term-idx)))
-
-
 
         csr
         (csr/->csr sparse-features)
