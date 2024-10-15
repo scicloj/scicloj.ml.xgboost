@@ -51,7 +51,7 @@
         ds-test (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document])
 
         _ (def ds-train ds-train)
-        bow-train
+        bow-train-old
         (-> ds-train
             text/->term-frequency-old
             text/add-word-idx)
@@ -59,51 +59,62 @@
         bow-train-new
         (-> ds-train
             text/->term-frequency
-            text/add-word-idx
-            (tc/order-by [:document :term-idx]))
+            text/add-word-idx)
 
 
 
-        bow-test
+        bow-test-old
         (-> ds-test
             text/->term-frequency-old
             text/add-word-idx)
 
-        _ (def bow-train bow-train)
+        bow-test-new
+        (-> ds-test
+            text/->term-frequency-old
+            text/add-word-idx)
+
+
+        _ (def bow-train-old bow-train-old)
         _ (def bow-train-new bow-train-new)
 
+        _
         (=
-         (-> bow-train :document)
+         (-> bow-train-old :document)
          (-> bow-train-new :document))
 
+        _
         (is
          (=
-          (apply + (take 1000 (-> bow-train :term-count)))
+          (apply + (take 1000 (-> bow-train-old :term-count)))
           (apply + (take 1000 (-> bow-train-new :term-count)))))
 
+        _
         (=
-         (-> bow-train :term-idx)
+         (-> bow-train-old :term-idx)
          (-> bow-train-new :term-idx))
 
-
+        _
         (=
-         (-> bow-train
+         (-> bow-train-old
              (tc/group-by :document)
              (tc/aggregate #(-> % :label first)))
          (-> bow-train-new
              (tc/group-by :document)
              (tc/aggregate #(-> % :label first))))
 
-
-        (-> bow-train
+        _
+        (-> bow-train-old
             (tc/select-columns [:document :term-idx :term-count])
             (tc/order-by [:document :term-idx :term-count]))
 
+        _
         (-> bow-train-new
             (tc/select-columns [:document :term-idx :term-count])
             (tc/order-by [:document :term-idx :term-count]))
 
 
+        bow-train bow-train-new
+        bow-test bow-test-new
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
                                                    (tc/select-columns bow-train [:label]))
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)

@@ -216,6 +216,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         (zipmap
          (-> bow :document distinct)
          (range))
+        
+        _ (def zero-baseddocs-map zero-baseddocs-map) 
         bow-zeroed
         (-> bow
             (tc/add-or-replace-column
@@ -227,8 +229,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         (-> bow-zeroed
             (tc/select-columns [:document :term-idx :term-count])
             (tc/rows))
+        
+        _ (def sparse-features sparse-features)
         n-col (inc (apply max  (bow-zeroed :term-idx)))
 
+        
         csr
         (csr/->csr sparse-features)
 
