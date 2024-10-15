@@ -11,7 +11,8 @@
             [tablecloth.column.api :as tcc]
             [scicloj.metamorph.ml :as ml]
             [tech.v3.dataset.column-filters :as cf]
-            [tech.v3.dataset :as ds])
+            [tech.v3.dataset.base :as ds-base]
+            [tech.v3.dataset.impl.dataset :as ds-impl])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]
            [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
@@ -37,8 +38,10 @@
                             :max-lines 1000
                             :skip-lines 1)
          (tc/rename-columns {:meta :label})
-         (tc/drop-rows #(= "" (:word %)))
-         (tc/drop-missing))
+         (tc/drop-rows #(= "" (:term %)))
+         (tc/drop-missing)
+         (tc/order-by [:document :term-idx])
+         (ds-base/ensure-dataset-string-tables))
 
         rnd-indexes (-> (range 1000) (deterministic-shuffle 123))
         rnd-indexes-train  (take 800 rnd-indexes)
@@ -47,18 +50,63 @@
         ds-train (tc/left-join (tc/dataset {:document rnd-indexes-train}) ds [:document])
         ds-test (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document])
 
+        _ (def ds-train ds-train)
         bow-train
         (-> ds-train
-            text/->term-frequency
-            text/add-word-idx)
-        bow-test
-        (-> ds-test
-            text/->term-frequency
+            text/->term-frequency-old
             text/add-word-idx)
 
-        m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train) 
-                                                   (tc/select-columns bow-train [:label]) )
-        m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test) 
+        bow-train-new
+        (-> ds-train
+            text/->term-frequency
+            text/add-word-idx
+            (tc/order-by [:document :term-idx]))
+
+
+
+        bow-test
+        (-> ds-test
+            text/->term-frequency-old
+            text/add-word-idx)
+
+        _ (def bow-train bow-train)
+        _ (def bow-train-new bow-train-new)
+
+        (=
+         (-> bow-train :document)
+         (-> bow-train-new :document))
+
+        (is
+         (=
+          (apply + (take 1000 (-> bow-train :term-count)))
+          (apply + (take 1000 (-> bow-train-new :term-count)))))
+
+        (=
+         (-> bow-train :term-idx)
+         (-> bow-train-new :term-idx))
+
+
+        (=
+         (-> bow-train
+             (tc/group-by :document)
+             (tc/aggregate #(-> % :label first)))
+         (-> bow-train-new
+             (tc/group-by :document)
+             (tc/aggregate #(-> % :label first))))
+
+
+        (-> bow-train
+            (tc/select-columns [:document :term-idx :term-count])
+            (tc/order-by [:document :term-idx :term-count]))
+
+        (-> bow-train-new
+            (tc/select-columns [:document :term-idx :term-count])
+            (tc/order-by [:document :term-idx :term-count]))
+
+
+        m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
+                                                   (tc/select-columns bow-train [:label]))
+        m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
                                                   (tc/select-columns bow-test [:label]))
 
         model

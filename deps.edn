@@ -4,7 +4,8 @@
   ml.dmlc/xgboost4j_2.12            {:mvn/version "2.1.1"}
   ;ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "2.1.1"} ;; what for ??
   org.scicloj/metamorph.ml          {:git/url "https://github.com/scicloj/metamorph.ml"
-                                     :git/sha "a7cf0fa4545e80e3ab30df0f81879fd6f7d930d9"}
+                                     :git/sha "6b2e634ac167651c3f5f0eda59f096a25796d32d"
+}
   ;{:mvn/version "0.9.0"}
 
   com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
