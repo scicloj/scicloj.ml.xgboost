@@ -221,11 +221,13 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
             (tc/add-or-replace-column
              :document
              #(map zero-baseddocs-map (:document %))))
+        
+        _ (def bow-zeroed bow-zeroed)
         sparse-features
         (-> bow-zeroed
-            (tc/select-columns [:document :word-idx :tf])
+            (tc/select-columns [:document :term-idx :term-count])
             (tc/rows))
-        n-col (inc (apply max  (bow-zeroed :word-idx)))
+        n-col (inc (apply max  (bow-zeroed :term-idx)))
 
         csr
         (csr/->csr sparse-features)
