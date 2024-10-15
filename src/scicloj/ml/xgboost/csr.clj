@@ -1,3 +1,5 @@
+;; re-implements https://blog.newtum.com/sparse-matrix-in-java/
+;; maybe se here, nmot sure teh same: https://github.com/scipy/scipy/blob/v1.14.1/scipy/sparse/_csr.py
 (ns scicloj.ml.xgboost.csr
   (:require
             [ tech.v3.datatype :as dt]
@@ -17,15 +19,18 @@
        :row-pointers new-row-pointers})))
 
 (defn ->csr [r-c-vs]
+  ;; data gets sorted by r and c
+  ;; not sure, if good idea for performace ?
+
   (->
    (reduce
-
     (fn [csr [row col value]]
       (add-to-csr csr row col value))
     {:values (dt/make-list :float)
      :column-indices (dt/make-list :int)
-     :row-pointers (dt/make-list :long [0])}
-    r-c-vs)
+     :row-pointers (dt/make-list :long [0])} 
+    (sort-by (juxt first second) 
+             r-c-vs))
 
    (#(assoc % :row-pointers (conj (:row-pointers %)
                                   (count (:values %)))))))

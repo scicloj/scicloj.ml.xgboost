@@ -6,11 +6,11 @@
 		"dockerfile": "Dockerfile",
 		"args": {
 			"BASE_IMAGE": "temurin-21-tools-deps-jammy",
-			"USERNAME": "${localEnv:USER}"
+			"USERNAME": "${localEnv:USER:vscode}"
 		}
 	},
-	"remoteUser": "${localEnv:USER}",
-	"containerUser": "${localEnv:USER}",
+	"remoteUser": "${localEnv:USER:vscode}",
+	"containerUser": "${localEnv:USER:vscode}",
 	"features": {
 		"ghcr.io/devcontainers/features/git:1": {}
 	},
