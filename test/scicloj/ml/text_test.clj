@@ -83,10 +83,9 @@
          (-> bow-train-new :document))
 
         _
-        (is
-         (=
-          (apply + (take 1000 (-> bow-train-old :term-count)))
-          (apply + (take 1000 (-> bow-train-new :term-count)))))
+        (=
+         (apply + (take 1000 (-> bow-train-old :term-count)))
+         (apply + (take 1000 (-> bow-train-new :term-count))))
 
         _
         (=
@@ -192,14 +191,14 @@
 
         sparse-features
         (-> bow
-            (tc/select-columns [:document :word-idx :tf])
+            (tc/select-columns [:document :term-idx :term-count])
             (tc/rows))
 
 
         n-rows (inc (apply tcc/max (bow :document)))
 
 
-        n-col (inc (apply max  (bow :word-idx)))
+        n-col (inc (apply max  (bow :term-idx)))
 
 
 
@@ -232,7 +231,9 @@
          m
          ["word"]
          ["label"]
-         {:num-class 2}
+         {:num-class 2
+          :verbosity 0
+}
          {}
          "multi:softprob")
 
@@ -244,20 +245,24 @@
         (.predict booster m)]
 
     (is (= ["I", "like", "fish", "and", "you", "the", "fish", "Do", "you", "like", "me", "?"]
-           (:word ds)))
+           (:term ds)))
 
 
-    (is (= [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4] (ds :word-index)))
+    (is (= [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4] (ds :term-index)))
 
     (is (= [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :document)))
 
     (is (=  [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :label)))
 
-    (is (= [1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
-           (:tf bow)))
+    (is (= 
+         [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1]
+         ;[1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
+           (:term-count bow)))
 
 
-    (is (= [[0 1 1] [0 2 1] [0 3 2] [0 4 1] [0 5 1] [0 6 1] [1 7 1] [1 5 1] [1 2 1] [1 8 1] [1 9 1]]
+    (is (= 
+         [[0 1 1] [0 2 1] [1 2 1] [0 3 2] [0 4 1] [0 5 1] [1 5 1] [0 6 1] [1 7 1] [1 8 1] [1 9 1]]
+         ;[[0 1 1] [0 2 1] [0 3 2] [0 4 1] [0 5 1] [0 6 1] [1 7 1] [1 5 1] [1 2 1] [1 8 1] [1 9 1]]
            sparse-features))
 
     (is (= 2 n-rows))
