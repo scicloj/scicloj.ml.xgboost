@@ -67,12 +67,15 @@
             )
 
 
+        n-sparse-columns (inc (apply max  (ds :token-idx)))
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
                                                    (tc/select-columns bow-train [:label])
-                                                   :tfidf)
+                                                   :tfidf
+                                                   n-sparse-columns)
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
                                                   (tc/select-columns bow-test [:label])
-                                                  :tfidf)
+                                                  :tfidf
+                                                  n-sparse-columns)
 
         model
         (xgboost/train-from-dmatrix

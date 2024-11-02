@@ -22,21 +22,25 @@
        :row-pointers new-row-pointers})))
 
 (defn ->csr [r-c-vs]
+  (println :->csr :count (count r-c-vs))
   ;; data gets sorted by r and c
   ;; not sure, if good idea for performace ?
-
-  (->
-   (reduce
-    (fn [csr [row col value]]
-      (add-to-csr csr row col value))
-    {:values (dt/make-list :float)
-     :column-indices (dt/make-list :int)
-     :row-pointers (dt/make-list :long [0])} 
-    (sort-by (juxt first second) 
-             r-c-vs))
-
-   (#(assoc % :row-pointers (conj (:row-pointers %)
-                                  (count (:values %)))))))
+  
+  (let [ r-c-v-maps
+        (->> r-c-vs
+             ( (fn [it] (println :sort) it))
+             (sort-by (juxt first second))
+             ( (fn [it] (println :reduce) it))
+             (reduce
+              (fn [csr [row col value]]
+                (add-to-csr csr row col value))
+              {:values (dt/make-list :float)
+               :column-indices (dt/make-list :int)
+               :row-pointers (dt/make-list :long [0])}))]  
+    
+    (assoc r-c-v-maps :row-pointers 
+           (conj (:row-pointers r-c-v-maps)
+                 (count (:values r-c-v-maps))))))
 
 
 (defn- first-non-nil-or-0 [s]

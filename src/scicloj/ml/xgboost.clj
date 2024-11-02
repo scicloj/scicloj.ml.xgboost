@@ -218,7 +218,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
             (tc/select-columns [:document :token-idx text-feature-column])
             (tc/rows))
         
-        ;n-col (inc (apply max  (bow-zeroed :token-idx)))
 
         ;_ (println :n-col n-col)
 

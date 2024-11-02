@@ -9,7 +9,7 @@
             [tech.v3.dataset.column-filters :as cf])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]))
-(def max-lines 10000) ;  fails with 10000
+(def max-lines 1000) ;  fails with 10000
 
 (defn deterministic-shuffle
   [^java.util.Collection coll seed]
@@ -31,6 +31,7 @@
                             #(str/split % #" ")
                             :max-lines max-lines
                             :skip-lines 1
+                            :datatype-document :int32
                             :datatype-token-idx :int32)
          :datasets
          first
