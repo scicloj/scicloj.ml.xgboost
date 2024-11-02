@@ -198,8 +198,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    nil))
 
 
-(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column]
-  (println :n-features (tc/row-count feature-ds))
+(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
+  ;(println :n-features (tc/row-count feature-ds))
   (let [ds (if (some? target-ds)
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
@@ -218,11 +218,13 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
             (tc/select-columns [:document :token-idx text-feature-column])
             (tc/rows))
         
-        n-col (inc (apply max  (bow-zeroed :token-idx)))
+        ;n-col (inc (apply max  (bow-zeroed :token-idx)))
+
+        ;_ (println :n-col n-col)
 
         csr  (csr/->csr sparse-features)
 
-       _ (println :max-column-index+1 (inc (apply max (:column-indices csr))))
+        ;_ (println :max-column-index+1 (inc (apply max (:column-indices csr))))
 
         
         labels
@@ -299,7 +301,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (if (= (-> feature-ds (get sparse-column) first class)
            SparseArray)
       (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column)
+      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
       
       )
        

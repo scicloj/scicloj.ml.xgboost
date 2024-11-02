@@ -224,16 +224,18 @@
 
          :datasets
          first
-         ;(tc/drop-rows #(= "" (:term %)))
          (tc/drop-missing)
          (text/->tfidf)
          (tc/rename-columns {:meta :label})
          (ds-mod/set-inference-target [:label]))
+
+        n-sparse-columns (inc (apply max  (reviews :token-idx)))
         model
         (ml/train reviews {:model-type :xgboost/classification
                            :sparse-column :token-count
                            :seed 123
-                           :num-class 5})
+                           :num-class 5
+                           :n-sparse-columns n-sparse-columns})
         prediction (ml/predict reviews model)
 
         expected

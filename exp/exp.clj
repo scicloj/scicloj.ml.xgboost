@@ -9,7 +9,7 @@
             [tech.v3.dataset.column-filters :as cf])
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java XGBoost]))
-(def max-lines 1000) ;  fails with 10000
+(def max-lines 10000) ;  fails with 10000
 
 (defn deterministic-shuffle
   [^java.util.Collection coll seed]
@@ -53,6 +53,8 @@
         _ (def ds-test ds-test)
         _ (tc/select-missing ds-train)
         _ (println :->term-frequency)
+
+        n-sparse-columns (inc (apply max  (ds :token-idx)))
         bow-train
         (-> ds-train
             text/->tfidf
@@ -70,10 +72,12 @@
         _ (def bow-train bow-train)
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
                                                    (tc/select-columns bow-train [:label])
-                                                   :tfidf)
+                                                   :tfidf
+                                                   n-sparse-columns)
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
                                                   (tc/select-columns bow-test [:label])
-                                                  :tfidf)
+                                                  :tfidf
+                                                  n-sparse-columns)
 
         _ (println :train)
         model
@@ -84,7 +88,9 @@
          {:num-class 5
           :validate-parameters "true"
           :seed 123
-          :verbosity 0}
+          :verbosity 0
+          ;:n-sparse-columns n-sparse-columns
+          }
          {}
          "multi:softmax")
 
