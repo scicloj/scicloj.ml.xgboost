@@ -1,18 +1,21 @@
 (ns scicloj.ml.text-test
-  (:require [clojure.data.csv :as csv]
-            [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest is]]
-            [scicloj.metamorph.ml.loss :as loss]
-            [scicloj.metamorph.ml.text :as text]
-            [scicloj.ml.xgboost :as xgboost]
-            [scicloj.ml.xgboost.csr :as csr]
-            [tablecloth.api :as tc]
-            [tablecloth.column.api :as tcc]
-            [tech.v3.dataset.column-filters :as cf])
-  (:import [java.util.zip GZIPInputStream]
-           [ml.dmlc.xgboost4j.java XGBoost]
-           [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
+  (:require
+   [clojure.data.csv :as csv]
+   [clojure.java.io :as io]
+   [clojure.set :as set]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is]]
+   [scicloj.metamorph.ml.loss :as loss]
+   [scicloj.metamorph.ml.text :as text]
+   [scicloj.ml.xgboost :as xgboost]
+   [scicloj.ml.xgboost.csr :as csr]
+   [tablecloth.api :as tc]
+   [tablecloth.column.api :as tcc]
+   [tech.v3.dataset.column-filters :as cf])
+  (:import
+   [java.util.zip GZIPInputStream]
+   [ml.dmlc.xgboost4j.java XGBoost]
+   [ml.dmlc.xgboost4j.java DMatrix DMatrix$SparseType]))
 
 
 (defn deterministic-shuffle
@@ -23,18 +26,22 @@
     (clojure.lang.RT/vector (.toArray al))))
 
 (deftest reviews-accuracy-sparse-matrix-classification
-  (let [ds
-        (->
-         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
-                            (fn [line]
-                              (let [splitted (first
-                                              (csv/read-csv line))]
-                                [(first splitted)
-                                 (dec (Integer/parseInt (second splitted)))]))
-                            #(str/split % #" ")
-                            :max-lines 1000
-                            :skip-lines 1)
-         (tc/rename-columns {:meta :label})
+  (let [tidy 
+        (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                           line-seq
+                           (fn [line]
+                             (let [splitted (first
+                                             (csv/read-csv line))]
+                               [(first splitted)
+                                (dec (Integer/parseInt (second splitted)))]))
+                           #(str/split % #" ")
+                           :max-lines 1000
+                           :skip-lines 1)
+        
+        ds
+        (-> tidy
+         :datasets first          
+         ;
          (tc/drop-rows #(= "" (:term %)))
          (tc/drop-missing))
 
@@ -45,14 +52,18 @@
         ds-train (tc/left-join (tc/dataset {:document rnd-indexes-train}) ds [:document])
         ds-test (tc/left-join (tc/dataset {:document rnd-indexes-test}) ds [:document])
 
+
         bow-train
         (-> ds-train
-            text/->term-frequency
+            
+            text/->tfidf
+            (tc/rename-columns {:meta :label})
             )
 
         bow-test
         (-> ds-test
-            text/->term-frequency
+            text/->tfidf
+            (tc/rename-columns {:meta :label})
             )
 
 
@@ -111,31 +122,43 @@
 
 (deftest small-text
 
-  (let [ds
+  (let [tidy-result
+        (text/->tidy-text (io/reader "test/data/small_text.csv")
+                          line-seq
+                          (fn [line]
+                            (let [splitted (first
+                                            (csv/read-csv line))]
+                              (vector
+                               (first splitted)
+                               (dec (Integer/parseInt (second splitted))))))
+                          #(str/split % #" ")
+                          :max-lines 10000
+                          :skip-lines 1)
+
+        tidy-ds
+
         (->
-         (text/->tidy-text (io/reader "test/data/small_text.csv")
-                           (fn [line]
-                             (let [splitted (first
-                                             (csv/read-csv line))]
-                               (vector
-                                (first splitted)
-                                (dec (Integer/parseInt (second splitted))))))
-                           #(str/split % #" ")
-                           :max-lines 10000
-                           :skip-lines 1)
-         (tc/rename-columns {:meta :label}))
-
+         tidy-result
+         :datasets
+         first)
+        
+  
+         id->token
+        (-> tidy-result :token-lookup-table set/map-invert)
+   
         bow
-        (-> ds text/->term-frequency)
-
+        (->
+         tidy-ds
+         text/->tfidf
+         (tc/rename-columns {:meta :label}))
 
         sparse-features
         (-> bow
-            (tc/select-columns [:document :term-idx :term-count])
+            (tc/select-columns [:document :token-idx :token-count])
             (tc/rows))
 
         n-rows (inc (apply tcc/max (bow :document)))
-        n-col (inc (apply max  (bow :term-idx)))
+        n-col (inc (apply max  (bow :token-idx)))
 
         csr
         (csr/->csr sparse-features)
@@ -167,8 +190,7 @@
          ["word"]
          ["label"]
          {:num-class 2
-          :verbosity 0
-}
+          :verbosity 0}
          {}
          "multi:softprob")
 
@@ -180,25 +202,25 @@
         (.predict booster m)]
 
     (is (= ["I", "like", "fish", "and", "you", "the", "fish", "Do", "you", "like", "me", "?"]
-           (:term ds)))
+           (map id->token (:token-idx tidy-ds))))
 
+    
+    
 
-    (is (= [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4] (ds :term-index)))
+    (is (= [1, 2, 3, 4, 5, 6, 3, 7, 5, 2, 8, 9] (tidy-ds :token-idx)))
 
-    (is (= [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :document)))
+    (is (= [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (tidy-ds :document)))
 
-    (is (=  [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (ds :label)))
+    (is (=  [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1] (tidy-ds :meta)))
 
     (is (= 
          [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1]
-         ;[1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
-           (:term-count bow)))
+         (:token-count bow)))
 
 
     (is (= 
-         [[0 1 1] [0 2 1] [1 2 1] [0 3 2] [0 4 1] [0 5 1] [1 5 1] [0 6 1] [1 7 1] [1 8 1] [1 9 1]]
-         ;[[0 1 1] [0 2 1] [0 3 2] [0 4 1] [0 5 1] [0 6 1] [1 7 1] [1 5 1] [1 2 1] [1 8 1] [1 9 1]]
-           sparse-features))
+         [[0 5 1] [0 6 1] [0 1 1] [0 3 2] [0 4 1] [0 2 1] [1 5 1] [1 9 1] [1 7 1] [1 8 1] [1 2 1]]
+         sparse-features))
 
     (is (= 2 n-rows))
     (is (= 10 n-col))

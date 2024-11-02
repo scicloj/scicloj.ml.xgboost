@@ -209,9 +209,10 @@
 
 
 (deftest tidy-text-train
-  (let [ reviews
+  (let [reviews
         (->
          (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                            line-seq
                             (fn [line]
                               (let [splitted (first
                                               (csv/read-csv line))]
@@ -220,32 +221,30 @@
                             #(str/split % #" ")
                             :max-lines 10000
                             :skip-lines 1)
-         
-         (tc/rename-columns {:meta :label})
-         (tc/drop-rows #(= "" (:term %)))
+
+         :datasets
+         first
+         ;(tc/drop-rows #(= "" (:term %)))
          (tc/drop-missing)
-         (text/->term-frequency)
+         (text/->tfidf)
+         (tc/rename-columns {:meta :label})
          (ds-mod/set-inference-target [:label]))
         model
         (ml/train reviews {:model-type :xgboost/classification
-                           :sparse-column :term-count
+                           :sparse-column :token-count
                            :seed 123
                            :num-class 5})
         prediction (ml/predict reviews model)
-        
+
         expected
         (-> reviews
             (tc/select-columns [:document :label])
             (tc/unique-by [:document :label])
-            :label
-            )]
+            :label)]
 
-    (is ( < 0.95
-          (loss/classification-accuracy
-           expected
-           (-> prediction
-               (ds-cat/reverse-map-categorical-xforms)
-               :label)
-           )))
-  )
-)
+    (is (< 0.95
+           (loss/classification-accuracy
+            expected
+            (-> prediction
+                (ds-cat/reverse-map-categorical-xforms)
+                :label))))))

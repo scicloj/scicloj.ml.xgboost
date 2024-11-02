@@ -5,7 +5,10 @@
             [ tech.v3.datatype :as dt]
             ))
 
-(defn- add-to-csr [csr row col value]
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
+(defn- add-to-csr [csr ^long row ^long col ^double value]
   (if (zero? value)
     csr
     (let [new-values (conj (:values csr) (float value))
@@ -43,7 +46,7 @@
 
 
 (defn ->dense [csr rows cols]
-  (for [i (range rows)]
+  (for [^long i (range rows)]
     (let [row-start (nth (:row-pointers csr) i)
           row-end   (nth (:row-pointers csr) (inc i))]
       (for [j (range cols)]
