@@ -26,7 +26,7 @@
     (clojure.lang.RT/vector (.toArray al))))
 
 (deftest reviews-accuracy-sparse-matrix-classification
-  (let [tidy 
+  (let [tidy
         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
                            line-seq
                            (fn [line]
@@ -37,13 +37,13 @@
                            #(str/split % #" ")
                            :max-lines 1000
                            :skip-lines 1)
-        
+
         ds
         (-> tidy
-         :datasets first          
+            :datasets first
          ;
-         (tc/drop-rows #(= "" (:term %)))
-         (tc/drop-missing))
+            (tc/drop-rows #(= "" (:term %)))
+            (tc/drop-missing))
 
         rnd-indexes (-> (range 1000) (deterministic-shuffle 123))
         rnd-indexes-train  (take 800 rnd-indexes)
@@ -55,16 +55,24 @@
 
         bow-train
         (-> ds-train
-            
+
             text/->tfidf
-            (tc/rename-columns {:meta :label})
-            )
+            (tc/rename-columns {:meta :label}))
 
         bow-test
         (-> ds-test
             text/->tfidf
-            (tc/rename-columns {:meta :label})
+            ;(tc/drop-columns [:meta])
             )
+
+
+        _ (def bow-test bow-test)
+
+
+        _ (def document->meta-map
+          (zipmap
+           (-> bow-test :document)
+           (-> bow-test :meta)))
 
 
         n-sparse-columns (inc (apply max  (ds :token-idx)))
@@ -98,10 +106,14 @@
          (.predict booster m-train)
          (map #(int (first %))))
 
+        _ (def predition-train predition-train)
+
         predition-test
         (->>
          (.predict booster m-test)
          (map #(int (first %))))
+
+        _ (def predition-test predition-test)
 
         train-accuracy
         (loss/classification-accuracy

@@ -199,25 +199,37 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
+  (def text-feature-column text-feature-column)
+  (def feature-ds feature-ds)
+  (def target-ds target-ds)
   ;(println :n-features (tc/row-count feature-ds))
-  (let [ds (if (some? target-ds)
+  (let [ds (if ( not (empty? target-ds))
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
 
+        _ (def ds ds)
         zero-baseddocs-map
         (zipmap
-         (-> ds :document distinct)
+         (-> ds :document distinct sort)
          (range))
+        
+
+
+        _ (def zero-baseddocs-map zero-baseddocs-map)
         bow-zeroed
         (-> ds
             (tc/add-or-replace-column
-             :document
+             :document-zero-based
              #(map zero-baseddocs-map (:document %))))
+        _ (def bow-zeroed bow-zeroed)
+
         sparse-features
         (-> bow-zeroed
-            (tc/select-columns [:document :token-idx text-feature-column])
+            (tc/select-columns [:document-zero-based :token-idx text-feature-column])
+            (tc/order-by [:document-zero-based])
             (tc/rows))
         
+        _ (def sparse-features sparse-features)
 
         ;_ (println :n-col n-col)
 
@@ -225,22 +237,25 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
         ;_ (println :max-column-index+1 (inc (apply max (:column-indices csr))))
 
-        
+        _ (def csr csr)
         labels
         (->
          bow-zeroed
          (tc/group-by :document)
          (tc/aggregate #(-> % :label first))
          (tc/column "summary"))
+        
+        _ (def labels labels)
         m
         (DMatrix.
          (long-array (:row-pointers csr))
          (int-array (:column-indices csr))
          (float-array (:values csr))
          DMatrix$SparseType/CSR
-         n-col)]
-    (when target-ds
-      (.setLabel m (float-array labels)))
+         n-col)
+         ]
+    (when ( seq target-ds)
+          (.setLabel m (float-array labels)))
     m))
 
 
@@ -413,24 +428,44 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
   (let [sparse-column-or-nil (:sparse-column options)
+        _ (def feature-ds feature-ds)
+
+        prediction-index->document--map
+        (zipmap
+         (range)
+         (-> feature-ds :document distinct sort))
+
+        _ (def prediction-index->document--map prediction-index->document--map)
+
         dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
         prediction (.predict ^Booster thawed-model dmatrix)
 
         predict-tensor (->> prediction
                             (dtt/->tensor))
-        target-cname (first target-columns)]
+        target-cname (first target-columns)
 
 
-    (if (multiclass-objective? (options->objective options))
-      (->
-       (model/finalize-classification predict-tensor
-                                      target-cname
-                                      target-categorical-maps)
 
-       (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
-       (ds/update-column (first  target-columns)
-                         #(vary-meta % assoc :column-type :prediction)))
-      (model/finalize-regression predict-tensor target-cname))))
+        prediction-df
+
+        (if (multiclass-objective? (options->objective options))
+          (->
+           (model/finalize-classification predict-tensor
+                                          target-cname
+                                          target-categorical-maps)
+
+           (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
+           (ds/update-column (first  target-columns)
+                             #(vary-meta % assoc :column-type :prediction)))
+          (model/finalize-regression predict-tensor target-cname))
+        document-ids
+        (map prediction-index->document--map (range (ds/row-count prediction-df)))]
+
+          (def prediction-df prediction-df)
+          
+
+          (assoc prediction-df
+                 :document document-ids)))
 
 
 

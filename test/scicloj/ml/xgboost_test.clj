@@ -17,7 +17,9 @@
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
             [tech.v3.datatype :as dtype] 
-            [tech.v3.datatype.functional :as dfn])
+            [tech.v3.datatype.functional :as dfn]
+            [scicloj.ml.xgboost.model :as model]
+            [tech.v3.datatype.functional :as fun])
   (:import [java.util.zip GZIPInputStream]))
 
 
@@ -236,17 +238,38 @@
                            :seed 123
                            :num-class 5
                            :n-sparse-columns n-sparse-columns})
-        prediction (ml/predict reviews model)
+        
+        ; reviews
+        ;(tc/select-rows reviews (fn [row] (contains? #{10 20 30} (:document row)))) 
+        
+        _ (def model model)
 
-        expected
-        (-> reviews
-            (tc/select-columns [:document :label])
-            (tc/unique-by [:document :label])
-            :label)]
+        prediction 
+        (->
+         (ml/predict reviews model)
+         (tc/select-columns [:label :document]))
+
+        
+        document->label
+        (zipmap
+         (:document reviews)
+         (:label reviews))
+        
+        document->label--trueth
+        (ds/->dataset
+         {:document (keys document->label)
+          :label (vals document->label)})
+        
+         prediction-and-trueth
+        (->
+         (tc/full-join prediction document->label--trueth [:document])
+         (tc/rename-columns {:label :prediction
+                             :right.label :trueth})
+         (tc/update-columns { :prediction (fn [col] (map int col))} ))
+        ]
 
     (is (< 0.95
            (loss/classification-accuracy
-            expected
-            (-> prediction
-                (ds-cat/reverse-map-categorical-xforms)
-                :label))))))
+            (:prediction prediction-and-trueth)
+            (:trueth prediction-and-trueth)
+            )))))
