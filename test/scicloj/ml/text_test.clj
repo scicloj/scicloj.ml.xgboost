@@ -66,13 +66,12 @@
             )
 
 
-        _ (def bow-test bow-test)
 
 
-        _ (def document->meta-map
-          (zipmap
-           (-> bow-test :document)
-           (-> bow-test :meta)))
+        document->meta-map
+        (zipmap
+         (-> bow-test :document)
+         (-> bow-test :meta))
 
 
         n-sparse-columns (inc (apply max  (ds :token-idx)))

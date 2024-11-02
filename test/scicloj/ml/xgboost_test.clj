@@ -211,7 +211,7 @@
 
 
 (deftest tidy-text-train
-  (let [reviews
+   (let [reviews
         (->
          (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
                             line-seq
@@ -221,7 +221,7 @@
                                 [(first splitted)
                                  (dec (Integer/parseInt (second splitted)))]))
                             #(str/split % #" ")
-                            :max-lines 10000
+                            ;:max-lines 10000
                             :skip-lines 1)
 
          :datasets
@@ -231,29 +231,37 @@
          (tc/rename-columns {:meta :label})
          (ds-mod/set-inference-target [:label]))
 
+        ;_ (def reviews reviews)
+
+        
         n-sparse-columns (inc (apply max  (reviews :token-idx)))
+        ;_ (def n-sparse-columns n-sparse-columns)
         model
         (ml/train reviews {:model-type :xgboost/classification
-                           :sparse-column :token-count
+                           :sparse-column :tfidf
                            :seed 123
                            :num-class 5
                            :n-sparse-columns n-sparse-columns})
         
-        ; reviews
-        ;(tc/select-rows reviews (fn [row] (contains? #{10 20 30} (:document row)))) 
-        
-        _ (def model model)
+         test-reviews reviews
+        ;; (->
+        ;;  (tc/select-rows reviews (fn [row] (contains? #{0 10 800 200 400} (:document row))))
+        ;;  (tc/shuffle)) 
+
+        ;_ (def test-reviews test-reviews)
+        ;_ (def model model)
 
         prediction 
         (->
-         (ml/predict reviews model)
+         (ml/predict test-reviews model)
          (tc/select-columns [:label :document]))
 
+        ;_ (def prediction prediction)
         
         document->label
         (zipmap
-         (:document reviews)
-         (:label reviews))
+         (:document test-reviews)
+         (:label test-reviews))
         
         document->label--trueth
         (ds/->dataset
@@ -268,6 +276,7 @@
          (tc/update-columns { :prediction (fn [col] (map int col))} ))
         ]
 
+    (def prediction-and-trueth prediction-and-trueth)
     (is (< 0.95
            (loss/classification-accuracy
             (:prediction prediction-and-trueth)
