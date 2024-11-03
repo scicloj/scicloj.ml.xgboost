@@ -41,7 +41,6 @@
         ds
         (-> tidy
             :datasets first
-         ;
             (tc/drop-rows #(= "" (:term %)))
             (tc/drop-missing))
 
@@ -62,20 +61,9 @@
         bow-test
         (-> ds-test
             text/->tfidf
-            (tc/rename-columns {:meta :label})
-            ;(tc/drop-columns [:meta])
-            )
+            (tc/rename-columns {:meta :label}))
 
 
-
-
-
-
-        _ (def bow-train bow-train)
-        _ (def bow-test bow-test)
-        _ (def ds ds)
-
-        
         n-sparse-columns (inc (apply max  (ds :token-idx)))
 
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
@@ -84,11 +72,9 @@
                                                    n-sparse-columns)
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
                                                   nil
-                                                  ;(tc/select-columns bow-test [:label])
                                                   :tf
                                                   n-sparse-columns)
 
-        _ (def m-train m-train)
         model
         (xgboost/train-from-dmatrix
          (:dmatrix m-train)
@@ -110,39 +96,11 @@
          (.predict booster (:dmatrix m-train))
          (mapv #(int (first %))))
 
-        _ (def predition-train predition-train)
 
         predition-test
         (->>
          (.predict booster (:dmatrix m-test))
          (mapv #(int (first %))))
-
-        _ (def predition-test predition-test)
-
-
-
-        ;; prediction-ds-train
-        ;; (tc/dataset
-        ;;  (map
-        ;;   (fn [document matrix-row prediction]
-        ;;     (hash-map :document document
-        ;;               :dmatrix-row matrix-row
-        ;;               :prediction prediction))
-        ;;   (vals (:document->dmatrix-row m-train))
-        ;;   (keys (:document->dmatrix-row m-train))
-        ;;   predition-train))
-        ;; _ (def prediction-ds-train prediction-ds-train)
-
-        ;; prediction-ds-test
-        ;; (tc/dataset
-        ;;  (map
-        ;;   (fn [document matrix-row prediction]
-        ;;     (hash-map :document document
-        ;;               :dmatrix-row matrix-row
-        ;;               :prediction prediction))
-        ;;   (vals (:document->dmatrix-row m-test))
-        ;;   (keys (:document->dmatrix-row m-test))
-        ;;   predition-test))
 
         trueth-ds-train
         (-> bow-train
@@ -160,34 +118,21 @@
             vec)
 
 
-
-
-        _ (def predition-train predition-train)
-        _ (def trueth-ds-train trueth-ds-train)
-
-        
         train-accuracy
         (loss/classification-accuracy
          predition-train
-         trueth-ds-train
-         )
+         trueth-ds-train)
 
-        _ (def prediction-test prediction-test)
-        _ (def trueth-ds-test trueth-ds-test)
         test-accuracy
         (loss/classification-accuracy
          predition-test
-         trueth-ds-test
-         )]
+         trueth-ds-test)]
 
     (println :train-accuracy train-accuracy)
     (println :test-accuracy test-accuracy)
 
     (is (< 0.95 train-accuracy))
-    (is (< 0.54 test-accuracy))
-    
-    
-    ))
+    (is (< 0.54 test-accuracy))))
 
 
 

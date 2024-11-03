@@ -231,11 +231,9 @@
           (tc/rename-columns {:meta :label})
           (ds-mod/set-inference-target [:label]))
 
-         _ (def reviews reviews)
 
          
          n-sparse-columns (inc (apply max  (reviews :token-idx)))
-        ;_ (def n-sparse-columns n-sparse-columns)
          model
          (ml/train reviews {:model-type :xgboost/classification
                             :sparse-column :tfidf
@@ -245,79 +243,30 @@
          
 
 
-         _ (-> reviews
-               
-               (tc/select-columns [:document :label])
-               (tc/unique-by [:document :label])
-               (tc/order-by [:document])
-               )
-          ;;=> _unnamed [10 2]:
-          ;;   
-          ;;   | :document | :label |
-          ;;   |----------:|--------|
-          ;;   |         0 |      3 |
-          ;;   |         1 |      4 |
-          ;;   |         2 |      4 |
-          ;;   |         3 |      2 |
-          ;;   |         4 |      4 |
-          ;;   |         5 |      4 |
-          ;;   |         6 |      4 |
-          ;;   |         7 |      4 |
-          ;;   |         8 |      3 |
-          ;;   |         9 |      4 |
-          ;;   
-         
          test-reviews reviews
-        ;; (->
-        ;;  (tc/select-rows reviews (fn [row] (contains? #{0 10 800 200 400} (:document row))))
-        ;;  (tc/shuffle)) 
-         
-         _ (def test-reviews test-reviews)
-         _ (def model model)
 
          prediction 
          (->
           (ml/predict test-reviews model)
-          (tc/select-columns [:label :document]))
+          (tc/select-columns [:label :document])
+          :label)
 
-         _ (def prediction prediction)
 
-         document->label--trueth 
+         trueth 
          (-> test-reviews
              (tc/select-columns [:document :label])
              (tc/unique-by [:document :label])
-             (tc/order-by :document)) 
+             :label
+             ) 
 
-         
-         _ (def document->label--trueth document->label--trueth)
-
-           
-
-         _ (-> document->label--trueth
-               (tc/order-by [:document]))
-
-
-         
-         
-         prediction-and-trueth
-         (->
-          (tc/full-join prediction document->label--trueth [:document])
-          (tc/rename-columns {:label :prediction
-                              :right.label :trueth})
-          (tc/update-columns { :prediction (fn [col] (map int col))} ))
-         
-
-         _ (def prediction-and-trueth prediction-and-trueth)
-
-         _ (-> prediction-and-trueth
-               (tc/order-by [:document]))
-         
          ]
 
     
     
     (is (< 0.95
            (loss/classification-accuracy
-            (:prediction prediction-and-trueth)
-            (:trueth prediction-and-trueth)
+            (vec prediction)
+            (vec trueth)
+
+            
             )))))

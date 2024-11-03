@@ -265,7 +265,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (when ( seq target-ds)
           (.setLabel m (float-array labels)))
     {:dmatrix m
-     :document->dmatrix-row zero-baseddocs-map}))
+     ;:document->dmatrix-row zero-baseddocs-map
+     }))
 
 
 (defn- dataset->labeled-point-iterator
@@ -324,7 +325,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (if (= (-> feature-ds (get sparse-column) first class)
            SparseArray)
       (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+      (:dmatrix (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns))
       
       )
        
