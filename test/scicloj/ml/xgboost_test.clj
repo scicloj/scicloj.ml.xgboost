@@ -10,16 +10,15 @@
             [scicloj.metamorph.ml.verify :as verify]
             [scicloj.ml.smile.discrete-nb :as nb]
             [scicloj.ml.smile.nlp :as nlp]
+            [fastmath.core :as fm]
             [scicloj.ml.xgboost]
             [tablecloth.api :as tc]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.categorical :as ds-cat]
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
-            [tech.v3.datatype :as dtype] 
-            [tech.v3.datatype.functional :as dfn]
-            [scicloj.ml.xgboost.model :as model]
-            [tech.v3.datatype.functional :as fun])
+            [tech.v3.datatype :as dtype]
+            [tech.v3.datatype.functional :as dfn])
   (:import [java.util.zip GZIPInputStream]))
 
 
@@ -79,7 +78,6 @@
                            :sparse-column :bow-sparse
                            :n-sparse-columns 100})
 
-
         explanation (ml/explain model)
         test-ds (ds/head reviews 100)
         prediction (ml/predict test-ds model)
@@ -91,6 +89,7 @@
          (-> test-ds
              (ds-cat/reverse-map-categorical-xforms)
              :Score))]
+    (is (fm/approx= 0.672 (second (first (tc/rows explanation)))))
     (is (> train-acc 0.97))))
 
 
@@ -99,7 +98,6 @@
         ds (->  src-ds
                 (ds/categorical->number cf/categorical)
                 (ds-mod/set-inference-target "species"))
-        feature-ds (cf/feature ds)
         split-data (ds-mod/train-test-split ds {:seed 12345})
         train-ds (:train-ds split-data)
         test-ds (:test-ds split-data)

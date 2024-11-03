@@ -21,7 +21,6 @@
        :row-pointers new-row-pointers})))
 
 (defn ->csr [r-c-vs]
-  (println :->csr :count (count r-c-vs))
   ;; data gets sorted by r and c
   ;; not sure, if good idea for performace ?
   

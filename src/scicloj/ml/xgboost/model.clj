@@ -26,16 +26,12 @@
   ;; attention: this function might be smile specific
   ;; it assumes a certain relation in the order of prediction probbalilities in `cls-tens`
   ;; and teh categoricla map
-  
+
   [cls-tens target-cname target-categorical-maps]
-  (def cls-tens cls-tens)
-  (def target-categorical-maps target-categorical-maps)
 
   (let [rename-map (-> (get-in target-categorical-maps
                                [target-cname :lookup-table])
-                       (set/map-invert))
-        ;n-cols (count rename-map)
-        ]
+                       (set/map-invert))]
     (-> (dtt/reshape cls-tens (dtype/shape cls-tens))
         (ds-tens/tensor->dataset)
         (ds/rename-columns rename-map)

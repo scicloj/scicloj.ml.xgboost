@@ -204,46 +204,30 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 ;; (def feature-ds feature-ds)
 ;; (def target-ds target-ds)
   ;(println :n-features (tc/row-count feature-ds))
-  (let [ds (if (not (empty? target-ds))
+  (let [ds (if (seq? target-ds)
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
 
-        _ (def ds ds)
         zero-baseddocs-map
         (zipmap
          (-> ds :document distinct)
          (range))
-        
 
-        ;n-col (inc (apply max  (ds :token-idx)))
-
-        _ (def zero-baseddocs-map zero-baseddocs-map)
-         bow-zeroed
-         (-> ds
-             (tc/select-columns [:document :token-idx text-feature-column])
-             (tc/add-or-replace-column
-              :document-zero-based
-              #(map zero-baseddocs-map (:document %))))
-        _ (def bow-zeroed bow-zeroed)
+        bow-zeroed
+        (-> ds
+            (tc/select-columns [:document :token-idx text-feature-column])
+            (tc/add-or-replace-column
+             :document-zero-based
+             #(map zero-baseddocs-map (:document %))))
 
         sparse-features
         (-> bow-zeroed
             (tc/select-columns [:document-zero-based :token-idx text-feature-column])
             (tc/order-by [:document-zero-based :token-idx])
             (tc/rows))
-        
 
-        
-        _ (def sparse-features sparse-features)
-
-        _ (println :n-col n-col)
 
         csr  (csr/->csr sparse-features)
-
-        ;_ (println :max-column-index+1 (inc (apply max (:column-indices csr))))
-
-        _ (def csr csr)
-        _ (def n-col n-col)
 
         labels
         (->
@@ -251,18 +235,14 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (tc/group-by :document)
          (tc/aggregate #(-> % :label first))
          (tc/column "summary"))
-        
-        _ (def labels labels)
+
         m
         (DMatrix.
          (long-array (:row-pointers csr))
          (int-array (:column-indices csr))
          (float-array (:values csr))
          DMatrix$SparseType/CSR
-         n-col)
-        
-        _ (def m m)
-         ]
+         n-col)]
     (when ( seq target-ds)
           (.setLabel m (float-array labels)))
     {:dmatrix m
@@ -270,10 +250,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
      (-> bow-zeroed
          (tc/select-columns [:document :document-zero-based])
          (tc/unique-by [:document :document-zero-based])
-         (tc/rename-columns {:document-zero-based :row-nr})
-         )
-
-     }))
+         (tc/rename-columns {:document-zero-based :row-nr}))}))
 
 
 (defn- dataset->labeled-point-iterator
