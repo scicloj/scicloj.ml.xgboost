@@ -75,6 +75,8 @@
                                                   :tf
                                                   n-sparse-columns)
 
+        _ (def m-train m-train)
+
         model
         (xgboost/train-from-dmatrix
          (:dmatrix m-train)

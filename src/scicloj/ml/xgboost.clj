@@ -188,14 +188,15 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn sparse-feature->dmatrix 
   "converts columns containing smile.util.SparseArray to a sparse dmatrix"
   [feature-ds target-ds sparse-column n-sparse-columns]
-  (DMatrix.
-   (.iterator
-    ^Iterable (map
-               (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
-               (get feature-ds sparse-column)
-               (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
-                    (repeat 0.0))))
-   nil))
+  {:dmatrix 
+   (DMatrix.
+    (.iterator
+     ^Iterable (map
+                (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
+                (get feature-ds sparse-column)
+                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
+                     (repeat 0.0))))
+    nil)})
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
@@ -232,7 +233,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
             (tc/rows))
         
 
-
+        
         _ (def sparse-features sparse-features)
 
         _ (println :n-col n-col)
@@ -265,7 +266,13 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (when ( seq target-ds)
           (.setLabel m (float-array labels)))
     {:dmatrix m
-     ;:document->dmatrix-row zero-baseddocs-map
+     :dmatrix-order
+     (-> bow-zeroed
+         (tc/select-columns [:document :document-zero-based])
+         (tc/unique-by [:document :document-zero-based])
+         (tc/rename-columns {:document-zero-based :row-nr})
+         )
+
      }))
 
 
@@ -290,8 +297,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
   (^DMatrix [feature-ds target-ds]
-   (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
-             nil))
+   {:dmatrix            
+    (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
+              nil)})
   (^DMatrix [feature-ds]
    (dataset->dmatrix feature-ds nil)))
 
@@ -321,15 +329,17 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    :alpha (ml-gs/linear 0.01 0.31 30)})
 
 (defn ->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
-  (if sparse-column
-    (if (= (-> feature-ds (get sparse-column) first class)
-           SparseArray)
-      (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-      (:dmatrix (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns))
-      
-      )
-       
-    (dataset->dmatrix feature-ds target-ds)))
+  (let [{:keys [dmatrix]}
+        (if sparse-column
+          (if (= (-> feature-ds (get sparse-column) first class)
+                 SparseArray)
+            (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+            (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+            
+            )
+          
+          (dataset->dmatrix feature-ds target-ds))]
+    {:dmatrix dmatrix}))
 
 
 
@@ -355,11 +365,12 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
           watches (->> base-watches
                        (reduce (fn  [^Map watches [k v]]
                                  (.put watches (ds-utils/column-safe-name k)
-                                       (->dmatrix
-                                        (ds/select-columns v feature-cnames)
-                                        (ds/select-columns v target-cnames)
-                                        sparse-column-or-nil
-                                        (:n-sparse-columns options)))
+                                       (:dmatrix
+                                        (->dmatrix
+                                         (ds/select-columns v feature-cnames)
+                                         (ds/select-columns v target-cnames)
+                                         sparse-column-or-nil
+                                         (:n-sparse-columns options))))
                                  watches)
                                  ;;Linked hash map to preserve order
                                (LinkedHashMap.)))
@@ -428,7 +439,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   (let [sparse-column-or-nil (:sparse-column options)
         feature-cnames (ds/column-names feature-ds)
         target-cnames (ds/column-names label-ds)
-        train-dmat (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options))
+        train-dmat (:dmatrix (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options)))
         objective (options->objective options)
 
         label-map (when (multiclass-objective? objective)
@@ -449,7 +460,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
         _ (def prediction-index->document--map prediction-index->document--map)
 
-        dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
+        dmatrix (:dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options)))
         prediction (.predict ^Booster thawed-model dmatrix)
 
         _ (def prediction prediction)
