@@ -79,7 +79,7 @@
 
         model
         (xgboost/train-from-dmatrix
-         (:dmatrix m-train)
+         m-train
          ["word"]
          ["label"]
          {:num-class 5
@@ -206,7 +206,8 @@
 
         model
         (xgboost/train-from-dmatrix
-         m
+         {:dmatrix m}
+         
          ["word"]
          ["label"]
          {:num-class 2

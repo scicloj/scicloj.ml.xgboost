@@ -329,17 +329,13 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    :alpha (ml-gs/linear 0.01 0.31 30)})
 
 (defn ->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
-  (let [{:keys [dmatrix]}
-        (if sparse-column
-          (if (= (-> feature-ds (get sparse-column) first class)
-                 SparseArray)
-            (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-            (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-            
-            )
-          
-          (dataset->dmatrix feature-ds target-ds))]
-    {:dmatrix dmatrix}))
+  (if sparse-column
+    (if (= (-> feature-ds (get sparse-column) first class)
+           SparseArray)
+      (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns))
+
+    (dataset->dmatrix feature-ds target-ds)))
 
 
 
@@ -355,11 +351,12 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 (defn train-from-dmatrix
-  [train-dmat feature-cnames target-cnames options label-map objective]
+  [train-dmat-map feature-cnames target-cnames options label-map objective]
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
   (locking #'multiclass-objective?
     (let [
+          train-dmat (:dmatrix train-dmat-map)
           sparse-column-or-nil (:sparse-column options)
           base-watches (or (:watches options) {})
           watches (->> base-watches
@@ -423,7 +420,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
           out-s (ByteArrayOutputStream.)]
       (.saveModel model out-s)
       (merge
-       {:model-data (.toByteArray out-s)}
+       {:model-data (.toByteArray out-s)
+        :tidy-text-dmatrix-order (:dmatrix-order train-dmat-map)}
        (when (seq watches)
          {:metrics
           (->> watches
@@ -439,7 +437,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   (let [sparse-column-or-nil (:sparse-column options)
         feature-cnames (ds/column-names feature-ds)
         target-cnames (ds/column-names label-ds)
-        train-dmat (:dmatrix (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options)))
+        train-dmat (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options))
         objective (options->objective options)
 
         label-map (when (multiclass-objective? objective)
@@ -453,12 +451,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
         
 
-        prediction-index->document--map
-        (zipmap
-         (range)
-         (-> feature-ds :document distinct sort))
+        ;; prediction-index->document--map
+        ;; (zipmap
+        ;;  (range)
+        ;;  (-> feature-ds :document distinct sort))
 
-        _ (def prediction-index->document--map prediction-index->document--map)
 
         dmatrix (:dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options)))
         prediction (.predict ^Booster thawed-model dmatrix)
@@ -484,14 +481,19 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                              #(vary-meta % assoc :column-type :prediction)))
           (model/finalize-regression predict-tensor target-cname))
         
-        document-ids
-        (map prediction-index->document--map (range (ds/row-count prediction-df)))]
+        ;document-ids
+        ;(map prediction-index->document--map (range (ds/row-count prediction-df)))
+        
+        ]
 
-         (def prediction-df prediction-df)
+         prediction-df
+         ;(def prediction-df prediction-df)
           
 
-          (assoc prediction-df
-                 :document document-ids)))
+          ;; (assoc prediction-df
+          ;;        :document document-ids)
+         
+         ))
 
 
 
