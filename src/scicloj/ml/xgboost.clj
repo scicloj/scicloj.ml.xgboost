@@ -200,14 +200,15 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
-;; (def text-feature-column text-feature-column)
-;; (def feature-ds feature-ds)
-;; (def target-ds target-ds)
+ ;(def text-feature-column text-feature-column)
+ ;(def feature-ds feature-ds)
+ ;(def target-ds target-ds)
   ;(println :n-features (tc/row-count feature-ds))
-  (let [ds (if (seq? target-ds)
+  (let [ds (if (seq target-ds)
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
 
+;        _ (def ds ds)
         zero-baseddocs-map
         (zipmap
          (-> ds :document distinct)
@@ -243,7 +244,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)]
-    (when ( seq target-ds)
+    
+    ;; (def target-ds target-ds)
+    ;; (def labels labels)
+    ;; (def m m)
+    (when (seq target-ds)
           (.setLabel m (float-array labels)))
     {:dmatrix m
      :dmatrix-order
