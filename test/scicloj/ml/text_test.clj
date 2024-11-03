@@ -62,31 +62,36 @@
         bow-test
         (-> ds-test
             text/->tfidf
+            (tc/rename-columns {:meta :label})
             ;(tc/drop-columns [:meta])
             )
 
 
 
 
-        document->meta-map
-        (zipmap
-         (-> bow-test :document)
-         (-> bow-test :meta))
 
 
+        _ (def bow-train bow-train)
+        _ (def bow-test bow-test)
+        _ (def ds ds)
+
+        
         n-sparse-columns (inc (apply max  (ds :token-idx)))
+
         m-train (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-train)
                                                    (tc/select-columns bow-train [:label])
-                                                   :tfidf
+                                                   :tf
                                                    n-sparse-columns)
         m-test (xgboost/tidy-text-bow-ds->dmatrix (cf/feature bow-test)
-                                                  (tc/select-columns bow-test [:label])
-                                                  :tfidf
+                                                  nil
+                                                  ;(tc/select-columns bow-test [:label])
+                                                  :tf
                                                   n-sparse-columns)
 
+        _ (def m-train m-train)
         model
         (xgboost/train-from-dmatrix
-         m-train
+         (:dmatrix m-train)
          ["word"]
          ["label"]
          {:num-class 5
@@ -102,33 +107,87 @@
 
         predition-train
         (->>
-         (.predict booster m-train)
-         (map #(int (first %))))
+         (.predict booster (:dmatrix m-train))
+         (mapv #(int (first %))))
 
         _ (def predition-train predition-train)
 
         predition-test
         (->>
-         (.predict booster m-test)
-         (map #(int (first %))))
+         (.predict booster (:dmatrix m-test))
+         (mapv #(int (first %))))
 
         _ (def predition-test predition-test)
 
+
+
+        ;; prediction-ds-train
+        ;; (tc/dataset
+        ;;  (map
+        ;;   (fn [document matrix-row prediction]
+        ;;     (hash-map :document document
+        ;;               :dmatrix-row matrix-row
+        ;;               :prediction prediction))
+        ;;   (vals (:document->dmatrix-row m-train))
+        ;;   (keys (:document->dmatrix-row m-train))
+        ;;   predition-train))
+        ;; _ (def prediction-ds-train prediction-ds-train)
+
+        ;; prediction-ds-test
+        ;; (tc/dataset
+        ;;  (map
+        ;;   (fn [document matrix-row prediction]
+        ;;     (hash-map :document document
+        ;;               :dmatrix-row matrix-row
+        ;;               :prediction prediction))
+        ;;   (vals (:document->dmatrix-row m-test))
+        ;;   (keys (:document->dmatrix-row m-test))
+        ;;   predition-test))
+
+        trueth-ds-train
+        (-> bow-train
+            (tc/unique-by [:document :label])
+            (tc/select-columns [:document :label])
+            :label
+            vec)
+
+
+        trueth-ds-test
+        (-> bow-test
+            (tc/unique-by [:document :label])
+            (tc/select-columns [:document :label])
+            :label
+            vec)
+
+
+
+
+        _ (def predition-train predition-train)
+        _ (def trueth-ds-train trueth-ds-train)
+
+        
         train-accuracy
         (loss/classification-accuracy
-         (float-array predition-train)
-         (.getLabel m-train))
+         predition-train
+         trueth-ds-train
+         )
 
+        _ (def prediction-test prediction-test)
+        _ (def trueth-ds-test trueth-ds-test)
         test-accuracy
         (loss/classification-accuracy
-         (float-array predition-test)
-         (.getLabel m-test))]
+         predition-test
+         trueth-ds-test
+         )]
 
     (println :train-accuracy train-accuracy)
     (println :test-accuracy test-accuracy)
 
     (is (< 0.95 train-accuracy))
-    (is (< 0.54 test-accuracy))))
+    (is (< 0.54 test-accuracy))
+    
+    
+    ))
 
 
 

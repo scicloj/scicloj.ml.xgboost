@@ -28,6 +28,8 @@
   ;; and teh categoricla map
   
   [cls-tens target-cname target-categorical-maps]
+  (def cls-tens cls-tens)
+  (def target-categorical-maps target-categorical-maps)
 
   (let [rename-map (-> (get-in target-categorical-maps
                                [target-cname :lookup-table])

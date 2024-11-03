@@ -50,8 +50,8 @@
 
 (defn ->dense [csr rows cols]
   (for [^long i (range rows)]
-    (let [row-start (nth (:row-pointers csr) i)
-          row-end   (nth (:row-pointers csr) (inc i))]
+    (let [row-start (nth (:row-pointers csr) i 0)
+          row-end   (nth (:row-pointers csr) (inc i) 0)]
       (for [j (range cols)]
         (first-non-nil-or-0
          (for [k (range row-start row-end)]

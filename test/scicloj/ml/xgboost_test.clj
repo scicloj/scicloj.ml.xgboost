@@ -212,71 +212,110 @@
 
 (deftest tidy-text-train
    (let [reviews
-        (->
-         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
-                            line-seq
-                            (fn [line]
-                              (let [splitted (first
-                                              (csv/read-csv line))]
-                                [(first splitted)
-                                 (dec (Integer/parseInt (second splitted)))]))
-                            #(str/split % #" ")
-                            ;:max-lines 10000
-                            :skip-lines 1)
+         (->
+          (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                             line-seq
+                             (fn [line]
+                               (let [splitted (first
+                                               (csv/read-csv line))]
+                                 [(first splitted)
+                                  (dec (Integer/parseInt (second splitted)))]))
+                             (fn [text] (take 1000 (str/split text #" ")))
+                             :max-lines 10000
+                             :skip-lines 1)
 
-         :datasets
-         first
-         (tc/drop-missing)
-         (text/->tfidf)
-         (tc/rename-columns {:meta :label})
-         (ds-mod/set-inference-target [:label]))
+          :datasets
+          first
+          (tc/drop-missing)
+          (text/->tfidf)
+          (tc/rename-columns {:meta :label})
+          (ds-mod/set-inference-target [:label]))
 
-        ;_ (def reviews reviews)
+         _ (def reviews reviews)
 
-        
-        n-sparse-columns (inc (apply max  (reviews :token-idx)))
+         
+         n-sparse-columns (inc (apply max  (reviews :token-idx)))
         ;_ (def n-sparse-columns n-sparse-columns)
-        model
-        (ml/train reviews {:model-type :xgboost/classification
-                           :sparse-column :tfidf
-                           :seed 123
-                           :num-class 5
-                           :n-sparse-columns n-sparse-columns})
-        
+         model
+         (ml/train reviews {:model-type :xgboost/classification
+                            :sparse-column :tfidf
+                            :seed 123
+                            :num-class 5
+                            :n-sparse-columns n-sparse-columns})
+         
+
+
+         _ (-> reviews
+               
+               (tc/select-columns [:document :label])
+               (tc/unique-by [:document :label])
+               (tc/order-by [:document])
+               )
+          ;;=> _unnamed [10 2]:
+          ;;   
+          ;;   | :document | :label |
+          ;;   |----------:|--------|
+          ;;   |         0 |      3 |
+          ;;   |         1 |      4 |
+          ;;   |         2 |      4 |
+          ;;   |         3 |      2 |
+          ;;   |         4 |      4 |
+          ;;   |         5 |      4 |
+          ;;   |         6 |      4 |
+          ;;   |         7 |      4 |
+          ;;   |         8 |      3 |
+          ;;   |         9 |      4 |
+          ;;   
+         
          test-reviews reviews
         ;; (->
         ;;  (tc/select-rows reviews (fn [row] (contains? #{0 10 800 200 400} (:document row))))
         ;;  (tc/shuffle)) 
+         
+         _ (def test-reviews test-reviews)
+         _ (def model model)
 
-        ;_ (def test-reviews test-reviews)
-        ;_ (def model model)
+         prediction 
+         (->
+          (ml/predict test-reviews model)
+          (tc/select-columns [:label :document]))
 
-        prediction 
-        (->
-         (ml/predict test-reviews model)
-         (tc/select-columns [:label :document]))
+         _ (def prediction prediction)
 
-        ;_ (def prediction prediction)
-        
-        document->label
-        (zipmap
-         (:document test-reviews)
-         (:label test-reviews))
-        
-        document->label--trueth
-        (ds/->dataset
-         {:document (keys document->label)
-          :label (vals document->label)})
-        
+         document->label--trueth 
+         (-> test-reviews
+             (tc/select-columns [:document :label])
+             (tc/unique-by [:document :label])
+             (tc/order-by :document)) 
+
+         
+         _ (def document->label--trueth document->label--trueth)
+
+           
+
+         _ (-> document->label--trueth
+               (tc/order-by [:document]))
+
+
+         
+         
          prediction-and-trueth
-        (->
-         (tc/full-join prediction document->label--trueth [:document])
-         (tc/rename-columns {:label :prediction
-                             :right.label :trueth})
-         (tc/update-columns { :prediction (fn [col] (map int col))} ))
-        ]
+         (->
+          (tc/full-join prediction document->label--trueth [:document])
+          (tc/rename-columns {:label :prediction
+                              :right.label :trueth})
+          (tc/update-columns { :prediction (fn [col] (map int col))} ))
+         
 
-    (def prediction-and-trueth prediction-and-trueth)
+         _ (def prediction-and-trueth prediction-and-trueth)
+
+         _ (-> prediction-and-trueth
+               (tc/order-by [:document]))
+         
+         ]
+
+    
+    
     (is (< 0.95
            (loss/classification-accuracy
             (:prediction prediction-and-trueth)

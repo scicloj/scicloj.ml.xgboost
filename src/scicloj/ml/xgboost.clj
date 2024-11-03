@@ -199,54 +199,59 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
-;(def text-feature-column text-feature-column)
-;  (def feature-ds feature-ds)
-;  (def target-ds target-ds)
+;; (def text-feature-column text-feature-column)
+;; (def feature-ds feature-ds)
+;; (def target-ds target-ds)
   ;(println :n-features (tc/row-count feature-ds))
   (let [ds (if (not (empty? target-ds))
              (assoc feature-ds :label (:label target-ds))
              feature-ds)
 
- ;       _ (def ds ds)
+        _ (def ds ds)
         zero-baseddocs-map
         (zipmap
-         (-> ds :document distinct sort)
+         (-> ds :document distinct)
          (range))
         
 
-        n-col (inc (apply max  (ds :token-idx)))
+        ;n-col (inc (apply max  (ds :token-idx)))
 
-        ;_ (def zero-baseddocs-map zero-baseddocs-map)
-        bow-zeroed
-        (-> ds
-            (tc/add-or-replace-column
-             :document-zero-based
-             #(map zero-baseddocs-map (:document %))))
-        ;_ (def bow-zeroed bow-zeroed)
+        _ (def zero-baseddocs-map zero-baseddocs-map)
+         bow-zeroed
+         (-> ds
+             (tc/select-columns [:document :token-idx text-feature-column])
+             (tc/add-or-replace-column
+              :document
+              #(map zero-baseddocs-map (:document %))))
+        _ (def bow-zeroed bow-zeroed)
 
         sparse-features
         (-> bow-zeroed
-            (tc/select-columns [:document-zero-based :token-idx text-feature-column])
-            (tc/order-by [:document-zero-based])
+            (tc/select-columns [:document :token-idx text-feature-column])
+            (tc/order-by [:document :token-idx])
             (tc/rows))
         
-        ;_ (def sparse-features sparse-features)
 
-        ;_ (println :n-col n-col)
+
+        _ (def sparse-features sparse-features)
+
+        _ (println :n-col n-col)
 
         csr  (csr/->csr sparse-features)
 
         ;_ (println :max-column-index+1 (inc (apply max (:column-indices csr))))
 
-        ;_ (def csr csr)
+        _ (def csr csr)
+        _ (def n-col n-col)
+
         labels
         (->
-         bow-zeroed
+         ds
          (tc/group-by :document)
          (tc/aggregate #(-> % :label first))
          (tc/column "summary"))
         
-        ;_ (def labels labels)
+        _ (def labels labels)
         m
         (DMatrix.
          (long-array (:row-pointers csr))
@@ -254,10 +259,13 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)
+        
+        _ (def m m)
          ]
     (when ( seq target-ds)
           (.setLabel m (float-array labels)))
-    m))
+    {:dmatrix m
+     :document->dmatrix-row zero-baseddocs-map}))
 
 
 (defn- dataset->labeled-point-iterator
@@ -429,21 +437,24 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
   (let [sparse-column-or-nil (:sparse-column options)
-        ;_ (def feature-ds feature-ds)
+        _ (def feature-ds feature-ds)
+
+        
 
         prediction-index->document--map
         (zipmap
          (range)
          (-> feature-ds :document distinct sort))
 
-        ;_ (def prediction-index->document--map prediction-index->document--map)
+        _ (def prediction-index->document--map prediction-index->document--map)
 
         dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
         prediction (.predict ^Booster thawed-model dmatrix)
 
-        ;_ (def prediction prediction)
-        predict-tensor (->> prediction
-                            (dtt/->tensor))
+        _ (def prediction prediction)
+        predict-tensor
+        (->> prediction
+             (dtt/->tensor))
         target-cname (first target-columns)
 
 
@@ -460,14 +471,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
            (ds/update-column (first  target-columns)
                              #(vary-meta % assoc :column-type :prediction)))
           (model/finalize-regression predict-tensor target-cname))
+        
         document-ids
+        (map prediction-index->document--map (range (ds/row-count prediction-df)))]
 
-        (map prediction-index->document--map (range (ds/row-count prediction-df)))
-        
-        
-        ]
-
-         ; (def prediction-df prediction-df)
+         (def prediction-df prediction-df)
           
 
           (assoc prediction-df
