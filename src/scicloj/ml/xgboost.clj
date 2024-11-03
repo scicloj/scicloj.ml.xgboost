@@ -221,14 +221,14 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (-> ds
              (tc/select-columns [:document :token-idx text-feature-column])
              (tc/add-or-replace-column
-              :document
+              :document-zero-based
               #(map zero-baseddocs-map (:document %))))
         _ (def bow-zeroed bow-zeroed)
 
         sparse-features
         (-> bow-zeroed
-            (tc/select-columns [:document :token-idx text-feature-column])
-            (tc/order-by [:document :token-idx])
+            (tc/select-columns [:document-zero-based :token-idx text-feature-column])
+            (tc/order-by [:document-zero-based :token-idx])
             (tc/rows))
         
 
