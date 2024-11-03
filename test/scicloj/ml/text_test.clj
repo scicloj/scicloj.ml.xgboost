@@ -54,7 +54,6 @@
 
         bow-train
         (-> ds-train
-
             text/->tfidf
             (tc/rename-columns {:meta :label}))
 

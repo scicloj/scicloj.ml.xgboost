@@ -242,7 +242,6 @@
                             :n-sparse-columns n-sparse-columns})
          
 
-         _ (def model model)
 
          test-reviews reviews
 
@@ -252,25 +251,23 @@
           (tc/select-columns [:label :document])
           )
 
-         _ (def raw-prediction raw-prediction)
-         prediction raw-prediction
+         prediction 
+         (->
+          raw-prediction
+          (tc/order-by :document))
 
          trueth 
          (-> test-reviews
              (tc/select-columns [:document :label])
              (tc/unique-by [:document :label])
+             (tc/order-by :document)
              :label
              ) 
 
          ]
 
-    (def prediction prediction)
-    (def trueth trueth)
     
     (is (< 0.95
            (loss/classification-accuracy
             (mapv int (:label prediction))
-            (vec trueth)
-
-            
-            )))))
+            (vec trueth))))))

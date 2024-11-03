@@ -447,29 +447,16 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
   (let [sparse-column-or-nil (:sparse-column options)
-        _ (def feature-ds feature-ds)
-
-        
-
-        ;; prediction-index->document--map
-        ;; (zipmap
-        ;;  (range)
-        ;;  (-> feature-ds :document distinct sort))
-
-
-        dmatrix (:dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options)))
+        dmatrix-context (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
+        dmatrix (:dmatrix dmatrix-context)
         prediction (.predict ^Booster thawed-model dmatrix)
 
-        _ (def prediction prediction)
         predict-tensor
         (->> prediction
              (dtt/->tensor))
         target-cname (first target-columns)
 
-
-
         prediction-df
-
         (if (multiclass-objective? (options->objective options))
           (->
            (model/finalize-classification predict-tensor
@@ -479,21 +466,17 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
            (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
            (ds/update-column (first  target-columns)
                              #(vary-meta % assoc :column-type :prediction)))
-          (model/finalize-regression predict-tensor target-cname))
-        
-        ;document-ids
-        ;(map prediction-index->document--map (range (ds/row-count prediction-df)))
-        
-        ]
+          (model/finalize-regression predict-tensor target-cname))]
 
-         prediction-df
-         ;(def prediction-df prediction-df)
-          
 
-          ;; (assoc prediction-df
-          ;;        :document document-ids)
-         
-         ))
+    (if (:dmatrix-order dmatrix-context)
+      (assoc prediction-df
+             :document
+             (-> dmatrix-context
+                 :dmatrix-order
+                 (tc/order-by :row-nr)
+                 :document))
+      prediction-df)))
 
 
 
