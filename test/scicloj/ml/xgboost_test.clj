@@ -1,19 +1,25 @@
 (ns scicloj.ml.xgboost-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.data.csv :as csv]
+            [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
+            [scicloj.metamorph.ml :as ml]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
+            [scicloj.metamorph.ml.loss :as loss]
+            [scicloj.metamorph.ml.text :as text]
+            [scicloj.metamorph.ml.verify :as verify]
+            [scicloj.ml.smile.discrete-nb :as nb]
+            [scicloj.ml.smile.nlp :as nlp]
+            [fastmath.core :as fm]
+            [scicloj.ml.xgboost]
+            [tablecloth.api :as tc]
             [tech.v3.dataset :as ds]
+            [tech.v3.dataset.categorical :as ds-cat]
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
             [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.functional :as dfn]
-            [scicloj.ml.smile.discrete-nb :as nb]
-            [scicloj.ml.smile.nlp :as nlp]
-            [scicloj.ml.xgboost]
-            [scicloj.metamorph.ml :as ml]
-            [scicloj.metamorph.ml.loss :as loss]
-            [scicloj.metamorph.ml.verify :as verify]
-            [tech.v3.dataset.categorical :as ds-cat]
-            [scicloj.metamorph.ml.gridsearch :as ml-gs]))
-
+            [tech.v3.datatype.functional :as dfn])
+  (:import [java.util.zip GZIPInputStream]))
 
 
 (deftest basic
@@ -25,7 +31,6 @@
                             :early-stopping-round 5
                             :round 50}
                            0.22))
-
 
 (deftest watches
   (let [{train-dataset :train-ds
@@ -73,7 +78,6 @@
                            :sparse-column :bow-sparse
                            :n-sparse-columns 100})
 
-        
         explanation (ml/explain model)
         test-ds (ds/head reviews 100)
         prediction (ml/predict test-ds model)
@@ -84,23 +88,22 @@
           :Score)
          (-> test-ds
              (ds-cat/reverse-map-categorical-xforms)
-             :Score))
-        ]
-       (is ( > train-acc 0.97))))
+             :Score))]
+    (is (fm/approx= 0.672 (second (first (tc/rows explanation)))))
+    (is (> train-acc 0.97))))
 
 
-(deftest iris 
-  (let [ src-ds (ds/->dataset "test/data/iris.csv")
+(deftest iris
+  (let [src-ds (ds/->dataset "test/data/iris.csv")
         ds (->  src-ds
                 (ds/categorical->number cf/categorical)
                 (ds-mod/set-inference-target "species"))
-        feature-ds (cf/feature ds)
         split-data (ds-mod/train-test-split ds {:seed 12345})
         train-ds (:train-ds split-data)
         test-ds (:test-ds split-data)
         model (ml/train train-ds {:validate-parameters "true"
                                   :seed 123
-                                  :verbosity 1
+                                  :verbosity 0
                                   :model-type :xgboost/classification})
         predictions (ml/predict test-ds model)
         loss
@@ -190,33 +193,104 @@
            (-> models first :accuracy (* 100) Math/round)))))
 
 
-(deftest no-cat-not-working 
-; https://github.com/scicloj/scicloj.ml.xgboost/issues/1
-  (let [ iris-no-cat-map
-        (->
-         (ds/->dataset "test/data/iris.csv" {:key-fn keyword})
-         (ds/categorical->number [:species] {} :float64)
-         (ds-mod/set-inference-target [:species])
-         (ds/assoc-metadata [:species] :categorical-map nil))
-        
-        model
-        (ml/train iris-no-cat-map {:model-type :xgboost/classification
-                                   :num-class 3})]
-    (is ( = []  
-          (:species (ml/predict iris-no-cat-map model)))))) 
-
-
-(deftest no-cat-craching
-; https://github.com/scicloj/scicloj.ml.xgboost/issues/1
+(deftest no-cat
   (let [iris-no-cat-map
         (->
          (ds/->dataset "test/data/iris.csv" {:key-fn keyword})
          (ds/categorical->number [:species] {} :float64)
          (ds-mod/set-inference-target [:species])
-         (ds/assoc-metadata [:species] :categorical-map nil))]
+         (ds/assoc-metadata [:species] :categorical-map nil))
 
-    (is ( thrown? Exception 
-          (ml/train iris-no-cat-map {:model-type :xgboost/classification
-                                     })))
-    )) 
+        model
+        (ml/train iris-no-cat-map {:model-type :xgboost/classification
+                                   :num-class 3})]
+    (is (= [ 0.0 2.0 1.0]
+            (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
 
+
+(deftest tidy-text-train
+   (let [reviews
+         (->
+          (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                             line-seq
+                             (fn [line]
+                               (let [splitted (first
+                                               (csv/read-csv line))]
+                                 [(first splitted)
+                                  (dec (Integer/parseInt (second splitted)))]))
+                             (fn [text] (take 1000 (str/split text #" ")))
+                             :max-lines 10000
+                             :skip-lines 1)
+
+          :datasets
+          first
+          (tc/drop-missing)
+          (text/->tfidf)
+          (tc/rename-columns {:meta :label}))
+
+         rnd-documents (shuffle (range 1000))
+         train-documents (into #{} (take 800 rnd-documents))
+         test-documents  (into #{} (take-last 200 rnd-documents))
+
+         train-reviews
+         (-> reviews
+             (tc/select-rows (fn [row] (contains? train-documents (:document row))))
+             (ds-mod/set-inference-target :label))
+
+         trueth-train
+         (-> train-reviews
+             (tc/select-columns [:document :label])
+             (tc/unique-by [:document :label])
+             (tc/order-by :document)
+             :label)
+
+         test-reviews
+         (-> reviews
+             (tc/select-rows (fn [row] (contains? test-documents (:document row)))))
+
+         trueth-test
+         (-> test-reviews
+             (tc/select-columns [:document :label])
+             (tc/unique-by [:document :label])
+             (tc/order-by :document)
+             :label)
+
+         test-review-clean
+         (-> test-reviews
+             (tc/drop-columns [:label]))
+
+
+         n-sparse-columns (inc (apply max  (reviews :token-idx)))
+         model
+         (ml/train train-reviews {:model-type :xgboost/classification
+                                  :sparse-column :tfidf
+                                  :seed 123
+                                  :num-class 5
+                                  :n-sparse-columns n-sparse-columns})
+
+
+         prediction-train
+         (->
+          (ml/predict train-reviews model)
+          (tc/select-columns [:label :document])
+          (tc/order-by :document))
+         
+         prediction-test
+         (->
+          (ml/predict test-review-clean model)
+          (tc/select-columns [:label :document])
+          (tc/order-by :document))
+         
+         ]
+
+    
+    (is (< 0.95
+           (loss/classification-accuracy
+            (mapv int (:label prediction-train))
+            (vec trueth-train))))
+    
+    (is (< 0.55
+           (loss/classification-accuracy
+            (mapv int (:label prediction-test))
+            (vec trueth-test))))
+    ))

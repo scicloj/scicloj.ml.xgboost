@@ -27,12 +27,12 @@
   ;; it assumes a certain relation in the order of prediction probbalilities in `cls-tens`
   ;; and teh categoricla map
 
-  [cls-tens n-rows target-cname target-categorical-maps]
+  [cls-tens target-cname target-categorical-maps]
+
   (let [rename-map (-> (get-in target-categorical-maps
                                [target-cname :lookup-table])
-                       (set/map-invert))
-        n-cols (count rename-map)]
-    (-> (dtt/reshape cls-tens [n-rows n-cols])
+                       (set/map-invert))]
+    (-> (dtt/reshape cls-tens (dtype/shape cls-tens))
         (ds-tens/tensor->dataset)
         (ds/rename-columns rename-map)
         (ds/update-columnwise :all vary-meta assoc

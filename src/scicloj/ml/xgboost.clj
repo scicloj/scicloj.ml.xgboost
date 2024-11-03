@@ -2,24 +2,26 @@
   "Require this namespace to get xgboost support for classification and regression.
   Defines a full range of xgboost model definitions and supports xgboost explain
   functionality."
-  (:require [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.errors :as errors]
-            [scicloj.metamorph.ml :as ml]
-            [scicloj.ml.xgboost.model :as model]
-            [scicloj.metamorph.ml.gridsearch :as ml-gs]
-            [tech.v3.dataset :as ds]
-            [tech.v3.dataset.tensor :as ds-tens]
-            [tech.v3.dataset.modelling :as ds-mod]
-            [tech.v3.dataset.utils :as ds-utils]
-            [tech.v3.tensor :as dtt]
-            [clojure.set :as set]
+  (:require [clojure.set :as set]
             [clojure.string :as s]
-            [clojure.tools.logging :as log])
-  (:import [ml.dmlc.xgboost4j.java Booster XGBoost  DMatrix]
-           [ml.dmlc.xgboost4j LabeledPoint]
-           [smile.util SparseArray SparseArray$Entry]
+            [clojure.tools.logging :as log]
+            [scicloj.metamorph.ml :as ml]
+            [scicloj.metamorph.ml.gridsearch :as ml-gs]
+            [scicloj.ml.xgboost.model :as model]
+            [tablecloth.api :as tc]
+            [tech.v3.dataset :as ds]
+            [tech.v3.dataset.modelling :as ds-mod]
+            [tech.v3.dataset.tensor :as ds-tens]
+            [tech.v3.dataset.utils :as ds-utils]
+            [tech.v3.datatype :as dtype]
+            [tech.v3.datatype.errors :as errors]
+            [tech.v3.tensor :as dtt]
+            [scicloj.ml.xgboost.csr :as csr])
+  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
-           [java.io ByteArrayInputStream ByteArrayOutputStream]))
+           [ml.dmlc.xgboost4j LabeledPoint]
+           [ml.dmlc.xgboost4j.java Booster DMatrix XGBoost DMatrix$SparseType]
+           [smile.util SparseArray SparseArray$Entry]))
 
 
 
@@ -183,16 +185,77 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                    (into-array Integer/TYPE (map :i x-i-s))
                    (into-array Float/TYPE (map :x x-i-s)))))
 
-(defn sparse-feature->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
-  (DMatrix.
-   (.iterator
-    ^Iterable (map
-               (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
-               (get feature-ds sparse-column)
-               (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
-                    (repeat 0.0))))
-   nil))
+(defn sparse-feature->dmatrix 
+  "converts columns containing smile.util.SparseArray to a sparse dmatrix"
+  [feature-ds target-ds sparse-column n-sparse-columns]
+  {:dmatrix 
+   (DMatrix.
+    (.iterator
+     ^Iterable (map
+                (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
+                (get feature-ds sparse-column)
+                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
+                     (repeat 0.0))))
+    nil)})
 
+
+(defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
+ ;(def text-feature-column text-feature-column)
+ ;(def feature-ds feature-ds)
+ ;(def target-ds target-ds)
+  ;(println :n-features (tc/row-count feature-ds))
+  (let [ds (if (seq target-ds)
+             (assoc feature-ds :label (:label target-ds))
+             feature-ds)
+
+;        _ (def ds ds)
+        zero-baseddocs-map
+        (zipmap
+         (-> ds :document distinct)
+         (range))
+
+        bow-zeroed
+        (-> ds
+            (tc/select-columns [:document :token-idx text-feature-column])
+            (tc/add-or-replace-column
+             :document-zero-based
+             #(map zero-baseddocs-map (:document %))))
+
+        sparse-features
+        (-> bow-zeroed
+            (tc/select-columns [:document-zero-based :token-idx text-feature-column])
+            (tc/order-by [:document-zero-based :token-idx])
+            (tc/rows))
+
+
+        csr  (csr/->csr sparse-features)
+
+        labels
+        (->
+         ds
+         (tc/group-by :document)
+         (tc/aggregate #(-> % :label first))
+         (tc/column "summary"))
+
+        m
+        (DMatrix.
+         (long-array (:row-pointers csr))
+         (int-array (:column-indices csr))
+         (float-array (:values csr))
+         DMatrix$SparseType/CSR
+         n-col)]
+    
+    ;; (def target-ds target-ds)
+    ;; (def labels labels)
+    ;; (def m m)
+    (when (seq target-ds)
+          (.setLabel m (float-array labels)))
+    {:dmatrix m
+     :dmatrix-order
+     (-> bow-zeroed
+         (tc/select-columns [:document :document-zero-based])
+         (tc/unique-by [:document :document-zero-based])
+         (tc/rename-columns {:document-zero-based :row-nr}))}))
 
 
 (defn- dataset->labeled-point-iterator
@@ -216,8 +279,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
   (^DMatrix [feature-ds target-ds]
-   (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
-             nil))
+   {:dmatrix            
+    (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
+              nil)})
   (^DMatrix [feature-ds]
    (dataset->dmatrix feature-ds nil)))
 
@@ -248,96 +312,14 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 (defn ->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
   (if sparse-column
-    (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+    (if (= (-> feature-ds (get sparse-column) first class)
+           SparseArray)
+      (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
+      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns))
+
     (dataset->dmatrix feature-ds target-ds)))
 
-(defn- train
-  [feature-ds label-ds options]
-  ;;XGBoost uses all cores so serialization here avoids over subscribing
-  ;;the machine.
-  (locking #'multiclass-objective?
-    (let [objective (options->objective options)
-          sparse-column-or-nil (:sparse-column options)
-          train-dmat (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options))
-          base-watches (or (:watches options) {})
-          feature-cnames (ds/column-names feature-ds)
-          target-cnames (ds/column-names label-ds)
-          watches (->> base-watches
-                       (reduce (fn  [^Map watches [k v]]
-                                 (.put watches (ds-utils/column-safe-name k)
-                                       (->dmatrix
-                                        (ds/select-columns v feature-cnames)
-                                        (ds/select-columns v target-cnames)
-                                        sparse-column-or-nil
-                                        (:n-sparse-columns options)))
-                                 watches)
-                               ;;Linked hash map to preserve order
-                               (LinkedHashMap.)))
-          round (or (:round options) 25)
-          early-stopping-round (or (when (:early-stopping-round options)
-                                     (int (:early-stopping-round options)))
-                                   0)
-          _ (when (and (> (count watches) 1)
-                       (not (instance? LinkedHashMap (:watches options)))
-                       (not= 0 early-stopping-round))
-              (log/warn "Early stopping indicated but watches has undefined iteration order.
-Early stopping will always use the 'last' of the watches as defined by the iteration
-order of the watches map.  Consider using a java.util.LinkedHashMap for watches.
-https://github.com/dmlc/xgboost/blob/master/jvm-packages/xgboost4j/src/main/java/ml/dml
-c/xgboost4j/java/XGBoost.java#L208"))
-          watch-names (->> base-watches
-                           (map-indexed (fn [idx [k v]]
-                                          [idx k]))
-                           (into {}))
-          label-map (when (multiclass-objective? objective)
-                      (ds-mod/inference-target-label-map label-ds))
-          cleaned-options 
-          (->
-           (dissoc options :model-type :watches)
-           (assoc :objective objective))
-          params (->>  cleaned-options
-                      ;;Adding in some defaults
-                       (merge
-                        {
-                          :alpha 0.0
-                          :eta 0.3
-                          :lambda 1.0
-                          :max-depth 6
-                          :subsample 0.87
-                         
-                         }
-                        
-                        cleaned-options
-                        (when label-map
-                          {:num-class (count label-map)}))
-                       (map (fn [[k v]]
-                              (when v
-                                [(s/replace (name k) "-" "_" ) v])))
 
-                       (remove nil?)
-                       (into {}))
-          ^"[[F" metrics-data (when-not (empty? watches)
-                                (->> (repeatedly (count watches)
-                                                 #(float-array round))
-                                     (into-array)))
-          
-          ^Booster model (XGBoost/train train-dmat params
-                                        (long round)
-                                        (or watches {}) metrics-data nil nil
-                                        (int early-stopping-round))
-          out-s (ByteArrayOutputStream.)]
-      (.saveModel model out-s)
-      (merge
-       {:model-data (.toByteArray out-s)}
-       (when (seq watches)
-         {:metrics
-          (->> watches
-               (map-indexed vector)
-               (map (fn [[watch-idx [watch-name watch-data]]]
-                      [(get watch-names watch-idx)
-                       (aget metrics-data watch-idx)]))
-               (into {})
-               (ds/->>dataset {:dataset-name :metrics}))})))))
 
 
 (defn- thaw-model
@@ -349,30 +331,136 @@ c/xgboost4j/java/XGBoost.java#L208"))
       (XGBoost/loadModel)))
 
 
+
+(defn train-from-dmatrix
+  [train-dmat-map feature-cnames target-cnames options label-map objective]
+  ;;XGBoost uses all cores so serialization here avoids over subscribing
+  ;;the machine.
+  (locking #'multiclass-objective?
+    (let [
+          train-dmat (:dmatrix train-dmat-map)
+          sparse-column-or-nil (:sparse-column options)
+          base-watches (or (:watches options) {})
+          watches (->> base-watches
+                       (reduce (fn  [^Map watches [k v]]
+                                 (.put watches (ds-utils/column-safe-name k)
+                                       (:dmatrix
+                                        (->dmatrix
+                                         (ds/select-columns v feature-cnames)
+                                         (ds/select-columns v target-cnames)
+                                         sparse-column-or-nil
+                                         (:n-sparse-columns options))))
+                                 watches)
+                                 ;;Linked hash map to preserve order
+                               (LinkedHashMap.)))
+          round (or (:round options) 25)
+          early-stopping-round (or (when (:early-stopping-round options)
+                                     (int (:early-stopping-round options)))
+                                   0)
+          _ (when (and (> (count watches) 1)
+                       (not (instance? LinkedHashMap (:watches options)))
+                       (not= 0 early-stopping-round))
+              (log/warn "Early stopping indicated but watches has undefined iteration order.
+  Early stopping will always use the 'last' of the watches as defined by the iteration
+  order of the watches map.  Consider using a java.util.LinkedHashMap for watches.
+  https://github.com/dmlc/xgboost/blob/master/jvm-packages/xgboost4j/src/main/java/ml/dml
+  c/xgboost4j/java/XGBoost.java#L208"))
+          watch-names (->> base-watches
+                           (map-indexed (fn [idx [k v]]
+                                          [idx k]))
+                           (into {}))
+          cleaned-options
+          (->
+           (dissoc options :model-type :watches)
+           (assoc :objective objective))
+          params (->>  cleaned-options
+                        ;;Adding in some defaults
+                       (merge
+                        {:alpha 0.0
+                         :eta 0.3
+                         :lambda 1.0
+                         :max-depth 6
+                         :subsample 0.87}
+
+                        cleaned-options
+                        (when label-map
+                          {:num-class (count label-map)}))
+                       (map (fn [[k v]]
+                              (when v
+                                [(s/replace (name k) "-" "_") v])))
+
+                       (remove nil?)
+                       (into {}))
+          ^"[[F" metrics-data (when-not (empty? watches)
+                                (->> (repeatedly (count watches)
+                                                 #(float-array round))
+                                     (into-array)))
+          ^Booster model (XGBoost/train train-dmat params
+                                        (long round)
+                                        (or watches {}) metrics-data nil nil
+                                        (int early-stopping-round))
+          out-s (ByteArrayOutputStream.)]
+      (.saveModel model out-s)
+      (merge
+       {:model-data (.toByteArray out-s)
+        :tidy-text-dmatrix-order (:dmatrix-order train-dmat-map)}
+       (when (seq watches)
+         {:metrics
+          (->> watches
+               (map-indexed vector)
+               (map (fn [[watch-idx [watch-name watch-data]]]
+                      [(get watch-names watch-idx)
+                       (aget metrics-data watch-idx)]))
+               (into {})
+               (ds/->>dataset {:dataset-name :metrics}))})))))
+
+
+(defn train [feature-ds label-ds options]
+  (let [sparse-column-or-nil (:sparse-column options)
+        feature-cnames (ds/column-names feature-ds)
+        target-cnames (ds/column-names label-ds)
+        train-dmat (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options))
+        objective (options->objective options)
+
+        label-map (when (multiclass-objective? objective)
+                    (ds-mod/inference-target-label-map label-ds))]
+    (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
+
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
   (let [sparse-column-or-nil (:sparse-column options)
-        dmatrix (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
+        dmatrix-context (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
+        dmatrix (:dmatrix dmatrix-context)
         prediction (.predict ^Booster thawed-model dmatrix)
-        predict-tensor (->> prediction
-                            (dtt/->tensor))
-        target-cname (first target-columns)]
+
+        predict-tensor
+        (->> prediction
+             (dtt/->tensor))
+        target-cname (first target-columns)
+
+        prediction-df
+        (if (multiclass-objective? (options->objective options))
+          (->
+           (model/finalize-classification predict-tensor
+                                          target-cname
+                                          target-categorical-maps)
+
+           (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
+           (ds/update-column (first  target-columns)
+                             #(vary-meta % assoc :column-type :prediction)))
+          (model/finalize-regression predict-tensor target-cname))]
 
 
-    (if (multiclass-objective? (options->objective options))
-      (->
-       (model/finalize-classification predict-tensor
-                                      (ds/row-count feature-ds)
-                                      target-cname
-                                      target-categorical-maps)
+    (if (:dmatrix-order dmatrix-context)
+      (assoc prediction-df
+             :document
+             (-> dmatrix-context
+                 :dmatrix-order
+                 (tc/order-by :row-nr)
+                 :document))
+      prediction-df)))
 
-       (tech.v3.dataset.modelling/probability-distributions->label-column
-        (first target-columns))
-       (ds/update-column (first  target-columns)
-                         #(vary-meta % assoc :column-type :prediction)))
-      (model/finalize-regression predict-tensor target-cname))))
 
-    
 
 
 (defn- explain
