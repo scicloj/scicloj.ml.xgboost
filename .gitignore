@@ -17,3 +17,5 @@ example/results.nippy
 .calva
 .lsp
 repeatedAbstrcats.txt
+test/data/amazon_reviews.libsvm
+test/data/amazon_reviews.csv

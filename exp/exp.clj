@@ -1,7 +1,6 @@
 (ns exp
   (:require
    [clojure.data.csv :as csv]
-   [clojure.data.csv :as csv]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [scicloj.metamorph.ml.text :as text]
@@ -12,28 +11,55 @@
 (def max-lines 1000000) ;  fails with 10000
 
 
+(comment)
+
+  (def tidy
+    (text/libsvm->tidy (io/reader "test/data/amazon_reviews.libsvm")))
+  
+    
+
+  (def r-c-vs
+    (-> tidy
+        (tc/select-columns [:instance :index :value])
+        (tc/head 1000000)
+        (tc/rows)))
+  
+  
+  
+
+  ;; "Elapsed time: 22430.996899 msecs"
+  ;; "Elapsed time: 901 msecs"
+  (time
+   (def csrs
+     (csr/->csr r-c-vs)))
+  
 
 
-(def reviews
-  (text/->tidy-text  (io/reader  (io/input-stream "test/data/amazon_reviews.csv"))
-                     line-seq
-                     (fn [line]
-                       (let [[[rating title text]]
-                             (csv/read-csv line)]
-                         [(str title " " text)
-                          (Integer/parseInt rating)]))
-                     #(str/split % #" ")
+(comment
+  (def reviews
+    (text/->tidy-text  (io/reader  (io/input-stream "test/data/amazon_reviews.csv"))
+                       line-seq
+                       (fn [line]
+                         (let [[[rating title text]]
+                               (csv/read-csv line)]
+                           [(str title " " text)
+                            (Integer/parseInt rating)]))
+                       #(str/split % #" ")
                      ;:max-lines max-lines
-                     :skip-lines 1
-                     :datatype-token-idx :int32
-                     :datatype-document :int32
-                     :container-type :native-heap))
+                       :skip-lines 1
+                       :datatype-token-idx :int32
+                       :datatype-document :int32
+                       :container-type :native-heap))
+  
 
-(def reday-for-softmax
-  (-> reviews
-      :datasets
-      first 
-      (tc/update-columns {:meta #(tcc/- % 1)})))
+  (def reday-for-softmax
+    (-> reviews
+        :datasets
+        first 
+        (tc/update-columns {:meta #(tcc/- % 1)})))
+  )
+
+
 
 (comment
   (def tfidf
@@ -46,23 +72,7 @@
 
   (text/tfidf->svmlib! tfidf (io/writer "test/data/amazon_reviews.libsvm") :tfidf)
   
-  (def tidy
-    (text/libsvm->tidy (io/reader "test/data/amazon_reviews.libsvm")))
-
   
-  
-  (def r-c-vs
-    (-> tidy
-        (tc/select-columns [:instance :index :value])
-        (tc/head 1000000)
-        (tc/rows)
-        
-        ))
-  
-;; "Elapsed time: 22430.996899 msecs"
-  (time
-   (def csrs
-     (csr/->csr r-c-vs)))
 
 ;; https://www.kaggle.com/code/shivangamsoni/sentiment-analysis-tf-idf
   
