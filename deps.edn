@@ -4,7 +4,7 @@
   ml.dmlc/xgboost4j_2.12            {:mvn/version "2.1.1"}
   ;ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "2.1.1"} ;; what for ??
   org.scicloj/metamorph.ml          {:git/url "https://github.com/scicloj/metamorph.ml"
-                                     :git/sha "785bdfa9ba72d37707b5f68bc3cae8648ede0d85"}
+                                     :git/sha "5374ed5c06a05a0a109f1464cc60bf74819995df"}
   ;{:mvn/version "0.9.0"}
 
   com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
@@ -15,7 +15,8 @@
   pppmap/pppmap {:mvn/version "1.0.0"}}
 
  :aliases {:exp {:extra-paths "exp"
-                 :jvm-opts ["-Xms12g" ]}
+                 :extra-deps {org.clojure/data.csv {:mvn/version "1.1.0"}}
+                 :jvm-opts ["-Xms8g" ]}
            :codox {:extra-deps {codox/codox {:mvn/version "0.10.7"}
                                 codox-theme-rdash/codox-theme-rdash {:mvn/version  "0.1.2"}}
                    :exec-fn codox.main/generate-docs

@@ -2,7 +2,8 @@
 ;; maybe se here, nmot sure teh same: https://github.com/scipy/scipy/blob/v1.14.1/scipy/sparse/_csr.py
 (ns scicloj.ml.xgboost.csr
   (:require
-   [tech.v3.datatype :as dt]))
+   [tech.v3.datatype :as dt]
+   [ham-fisted.api :as hf]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -12,9 +13,9 @@
     csr
     (let [new-values (conj (:values csr) (float value))
           new-column-indices (conj (:column-indices csr) col)
-          new-row-pointers (if (<= (count (:row-pointers csr)) row)
+          new-row-pointers (if (<= (long (hf/constant-count (:row-pointers csr))) row)
 
-                             (conj (:row-pointers csr) (dec (count new-values)))
+                             (conj (:row-pointers csr) (dec (long (hf/constant-count new-values))))
                              (:row-pointers csr))]
       {:values new-values
        :column-indices new-column-indices
@@ -32,13 +33,13 @@
              (reduce
               (fn [csr [row col value]]
                 (add-to-csr csr row col value))
-              {:values (dt/make-list :float)
-               :column-indices (dt/make-list :int)
-               :row-pointers (dt/make-list :long [0])}))]  
+              {:values (hf/float-array-list)
+               :column-indices (hf/int-array-list)
+               :row-pointers (hf/long-array-list [0])}))]  
     
     (assoc r-c-v-maps :row-pointers 
            (conj (:row-pointers r-c-v-maps)
-                 (count (:values r-c-v-maps))))))
+                 (hf/constant-count (:values r-c-v-maps))))))
 
 
 (defn- first-non-nil-or-0 [s]
