@@ -27,9 +27,7 @@
   
   (let [ r-c-v-maps
         (->> r-c-vs
-             ( (fn [it] (println :sort) it))
              (sort-by (juxt first second))
-             ( (fn [it] (println :reduce) it))
              (reduce
               (fn [csr [row col value]]
                 (add-to-csr csr row col value))
