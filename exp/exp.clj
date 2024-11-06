@@ -99,26 +99,3 @@
      "multi:softmax")))
 
 
-(require '[tech.v3.datatype :as dt]
-         '[tech.v3.datatype.list :as dt-list])
-
-
-(def l (dt/make-list :float32))
-(.add l 1.0)
-;;=> true
-l
-;;=> [1.0]
-
-
-(def l-1 (dt-list/wrap-container (dt/make-container :jvm-heap :float32 0)))
-(.add l-1 1.0)
-;;=> true
-l-1
-;;=> [1.0]
-
-
-(def l-2 (dt-list/wrap-container (dt/make-container :native-heap :float32 0)))
-(.ensureCapacity l-2 1)
-;;=> Execution error (IndexOutOfBoundsException) at tech.v3.datatype.native_buffer.DoubleNativeBuf/writeDouble (native_buffer.clj:424).
-;;   idx (0) >= n-elems (0)
-;;   

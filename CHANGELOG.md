@@ -1,6 +1,6 @@
 # ConstantChangeLog
 
-## unreleased
+## 6.2.0
 - fixed issue #1
 - support tidy-text data as input
 
