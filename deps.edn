@@ -2,11 +2,8 @@
  :deps
  {org.clojure/clojure               {:mvn/version "1.12.0"}
   ml.dmlc/xgboost4j_2.12            {:mvn/version "2.1.1"}
-  ;ml.dmlc/xgboost4j-spark_2.12      {:mvn/version "2.1.1"} ;; what for ??
-  org.scicloj/metamorph.ml          {:git/url "https://github.com/scicloj/metamorph.ml"
-                                     :git/sha "5374ed5c06a05a0a109f1464cc60bf74819995df"}
-  ;{:mvn/version "0.9.0"}
-
+  org.scicloj/metamorph.ml          {:mvn/version "0.10.0"}
+  
   com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
 
   org.apache.hadoop/hadoop-common   {:mvn/version "3.3.0"
