@@ -32,7 +32,12 @@
    [:licenses
     [:license
      [:name "Eclipse Public License - v 1.0"]
-     [:url "https://www.eclipse.org/legal/epl-1.0/"]]]])
+     [:url "https://www.eclipse.org/legal/epl-1.0/"]]]
+   [:scm
+    [:url "https://github.com/scicloj/scicloj.ml.xgboost"]
+    [:connection "scm:git:https://github.com/scicloj/scicloj.ml.xgboost.git"]
+    [:developerConnection "scm:git:https://github.com/scicloj/scicloj.ml.xgboost.git"]
+    [:tag (str "v" version)]]])
 
 
 (defn- jar-opts [opts]
