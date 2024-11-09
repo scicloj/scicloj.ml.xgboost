@@ -403,7 +403,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
       (.saveModel model out-s)
       (merge
        {:model-data (.toByteArray out-s)
-        :tidy-text-dmatrix-order (:dmatrix-order train-dmat-map)}
+        ;:tidy-text-dmatrix-order (:dmatrix-order train-dmat-map)
+        }
        (when (seq watches)
          {:metrics
           (->> watches
