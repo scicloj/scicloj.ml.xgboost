@@ -3,7 +3,7 @@
 
 # scicloj.ml.xgboost
 
-xgboost models for [metamorph.ml](https://github.com/scicloj/metamorph.ml) and [scicloj.ml](https://github.com/scicloj/scicloj.ml)
+xgboost models for [metamorph.ml](https://github.com/scicloj/metamorph.ml) 
 
 
 * For a more in-depth walkthrough of XGBoost features, checkout the
