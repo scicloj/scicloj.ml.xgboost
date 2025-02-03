@@ -16,7 +16,9 @@
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.errors :as errors]
             [tech.v3.tensor :as dtt]
-            [scicloj.ml.xgboost.csr :as csr])
+            [scicloj.ml.xgboost.csr :as csr]
+            [camel-snake-kebab.core :as csk]
+            )
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
            [ml.dmlc.xgboost4j LabeledPoint]
@@ -387,7 +389,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                           {:num-class (count label-map)}))
                        (map (fn [[k v]]
                               (when v
-                                [(s/replace (name k) "-" "_") v])))
+                                
+                                [(csk/->snake_case_string k) v])))
 
                        (remove nil?)
                        (into {}))
@@ -498,6 +501,17 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   [m key value]
   (if value (assoc m key value) m))
 
+(defn- reg-def->options [reg-def]
+  (vec
+   (concat [:map]
+           (mapv (fn [o]
+
+                   (vector
+                    (csk/->kebab-case-keyword (:name o))
+                    {:optional true}
+                    :any))
+                 (:options reg-def)))))
+
 (doseq [objective (concat [:regression :classification]
                           (keys objective-types))]
   (let [reg-def (get objective-types objective)
@@ -507,11 +521,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          :hyperparameters hyperparameters
          :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
                          :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}}
-        model-meta (assoc-if model-meta :options (:options reg-def) ) ]
+        model-meta (assoc-if model-meta :options (reg-def->options reg-def)) ]
     (ml/define-model! (keyword "xgboost" (name objective))
       train predict model-meta)))
 
-
  
-
-

@@ -294,3 +294,4 @@
             (mapv int (:label prediction-test))
             (vec trueth-test))))
     ))
+

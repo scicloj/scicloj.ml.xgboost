@@ -2,9 +2,13 @@
  :deps
  {org.clojure/clojure               {:mvn/version "1.12.0"}
   ml.dmlc/xgboost4j_2.12            {:mvn/version "2.1.1"}
-  org.scicloj/metamorph.ml          {:mvn/version "0.10.2"}
+  org.scicloj/metamorph.ml          
+  {:git/url "https://github.com/scicloj/metamorph.ml"
+   :git/sha "53edc16395a98bacb31af7dd61e1b5c1736b92dd"}
+  ;;{:mvn/version "0.10.2"}
+
   
-  com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
+  ;com.github.haifengl/smile-core    {:mvn/version "2.6.0"}
 
   org.apache.hadoop/hadoop-common   {:mvn/version "3.3.0"
                                      :exclusions [org.apache.commons/commons-math3
@@ -14,13 +18,7 @@
  :aliases {:exp {:extra-paths "exp"
                  :extra-deps {org.clojure/data.csv {:mvn/version "1.1.0"}}
                  :jvm-opts ["-Xms8g" ]}
-           :codox {:extra-deps {codox/codox {:mvn/version "0.10.7"}
-                                codox-theme-rdash/codox-theme-rdash {:mvn/version  "0.1.2"}}
-                   :exec-fn codox.main/generate-docs
-                   :exec-args {:metadata {:doc/format :markdown}
-                               :themes [:rdash]
-                               :source-paths ["src"]
-                               :output-path "docs"}}
+           
 
 
 
@@ -36,6 +34,9 @@
            :test {:extra-paths ["test"]
 
                   :extra-deps {
-                               org.scicloj/scicloj.ml.smile {:mvn/version "7.4.2"}
+                               org.scicloj/scicloj.ml.smile 
+                               {:git/url "https://github.com/scicloj/scicloj.ml.smile"
+                                :git/sha "e10badbe7dbbda8d3b9960753ab2a3b17d52e003"}
+                               ;;{:mvn/version "7.4.2"}
                                lambdaisland/kaocha {:mvn/version "1.60.945"}}}}}
                   

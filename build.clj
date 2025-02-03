@@ -24,7 +24,9 @@
 
 
 (defn test "Run the tests." [opts]
-  (bb/run-tests opts))
+  (-> opts
+      (assoc :aliases [:test :run-tests])
+      (bb/run-tests)))
 
 (defn- pom-template []
   [[:description "xgboost models for metamorph.ml and scicloj.ml"]
@@ -67,7 +69,7 @@
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
   (-> opts
       (assoc :lib lib :version version
-             :aliases [:run-tests])
+             :aliases [:test :run-tests])
       (test)
       (bb/clean)
       (jar)))
