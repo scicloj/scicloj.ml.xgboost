@@ -7,19 +7,11 @@
 (def lib 'org.scicloj/scicloj.ml.xgboost)
 ; alternatively, use MAJOR.MINOR.COMMITS:
 ;; (def version (format "7.0.%s" (b/git-count-revs nil)))
-(def version "6.2.0")
+(def version "6.3.0")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 ;;(def jar-file (format "target/%s-%s.jar" (name lib) version))
 
-
-
-(defn compile [_]
-  (b/javac {:src-dirs ["java"]
-            :class-dir class-dir
-            :basis basis
-            ;;:javac-opts ["-source" "8" "-target" "8"]
-            }))
 
 
 
@@ -54,7 +46,6 @@
 
 
 (defn jar [_]
-  (compile nil)
   (b/write-pom {:class-dir class-dir
                 :lib lib
                 :version version
