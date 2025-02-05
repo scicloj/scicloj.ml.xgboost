@@ -1,5 +1,8 @@
 # ConstantChangeLog
 
+## unreleased
+- made predition target datatypes symetric to train data 
+
 ## 6.3.0
 - options as malli
 

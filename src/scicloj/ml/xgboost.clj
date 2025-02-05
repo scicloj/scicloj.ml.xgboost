@@ -431,7 +431,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
 
 (defn- predict
-  [feature-ds thawed-model {:keys [target-columns target-categorical-maps options]}]
+  [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes options]}]
   (let [sparse-column-or-nil (:sparse-column options)
         dmatrix-context (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
         dmatrix (:dmatrix dmatrix-context)
@@ -449,7 +449,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                           target-cname
                                           target-categorical-maps)
 
-           (tech.v3.dataset.modelling/probability-distributions->label-column target-cname)
+           (tech.v3.dataset.modelling/probability-distributions->label-column
+            target-cname
+            (get target-datatypes target-cname))
            (ds/update-column (first  target-columns)
                              #(vary-meta % assoc :column-type :prediction)))
           (model/finalize-regression predict-tensor target-cname))]

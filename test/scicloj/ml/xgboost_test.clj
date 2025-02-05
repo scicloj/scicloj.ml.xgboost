@@ -295,3 +295,27 @@
             (vec trueth-test))))
     ))
 
+
+(defn- validate-target-symetry [datatype]
+  (is (= datatype
+           (->>
+            (ml/train
+             (-> (ds/->dataset {:x [1 2 3 4]
+                                :y [:a :b :c :d]})
+                 (ds/categorical->number [:y] [] datatype)
+                 (ds-mod/set-inference-target [:y]))
+             {:model-type :xgboost/classification})
+            (ml/predict
+             (-> (ds/->dataset {:x [1 2 3 4]})))
+            :y
+            meta
+            :datatype))))
+
+
+(deftest validate-target-sym
+  (validate-target-symetry :int8)
+  (validate-target-symetry :int16)
+  (validate-target-symetry :int32)
+  (validate-target-symetry :int64)
+  (validate-target-symetry :float32)
+  (validate-target-symetry :float64))
