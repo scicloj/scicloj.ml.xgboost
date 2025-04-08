@@ -2,7 +2,7 @@
   (:require [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is testing]]
             [scicloj.metamorph.ml :as ml]
             [scicloj.metamorph.ml.gridsearch :as ml-gs]
             [scicloj.metamorph.ml.loss :as loss]
@@ -319,3 +319,66 @@
   (validate-target-symetry :int64)
   (validate-target-symetry :float32)
   (validate-target-symetry :float64))
+
+
+(deftest sample-weights-test
+  (testing "classification support"
+    (let [titanic (-> (ds/->dataset "test/data/titanic.csv")
+                      (ds/drop-columns ["Name"])
+                      (ds/update-column "Survived" (fn [col]
+                                                     (dtype/emap #(if (== 1 (long %))
+                                                                    "survived"
+                                                                    "drowned")
+                                                                 :string col)))
+                      (ds-mod/set-inference-target "Survived"))
+
+          titanic-numbers (ds/categorical->number titanic cf/categorical)
+          split-data      (ds-mod/train-test-split titanic-numbers {:seed 1234})
+          train-ds        (:train-ds split-data)
+          weights         (ds/->dataset
+                            {:weight (repeatedly (ds/row-count train-ds) rand)}
+                            {:dataset-name "Weights"})
+          test-ds         (:test-ds split-data)
+          model-a         (ml/train train-ds {:model-type :xgboost/classification})
+          model-b         (ml/train train-ds {:model-type     :xgboost/classification
+                                              :sample-weights weights})
+          predictions-a   (ml/predict test-ds model-a)
+          predictions-b   (ml/predict test-ds model-b)]
+      (is (not= predictions-a predictions-b))))
+
+  (testing "sparse column support"
+    (let [reviews
+          (->
+            (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
+            (ds/select-columns [:Text :Score])
+            (nlp/count-vectorize :Text :bow nlp/default-text->bow)
+            (nb/bow->SparseArray :bow :bow-sparse {:create-vocab-fn #(nlp/->vocabulary-top-n % 100)})
+            (ds/drop-columns [:Text :bow])
+            (ds/update-column :Score
+                              (fn [col]
+                                (let [val-map {0 :c0
+                                               1 :c1
+                                               2 :c2
+                                               3 :c3
+                                               4 :c4
+                                               5 :c5}]
+                                  (dtype/emap val-map :keyword col))))
+            (ds/categorical->number cf/categorical)
+            (ds-mod/set-inference-target :Score))
+          weights (ds/->dataset
+                    {:weight (repeatedly (ds/row-count reviews) rand)}
+                    {:dataset-name "Weights"})
+          model-a
+          (ml/train reviews {:model-type       :xgboost/classification
+                             :sparse-column    :bow-sparse
+                             :n-sparse-columns 100})
+
+          model-b
+          (ml/train reviews {:model-type       :xgboost/classification
+                             :sparse-column    :bow-sparse
+                             :n-sparse-columns 100
+                             :sample-weights weights})
+          test-ds      (ds/head reviews 100)
+          prediction-a (ml/predict test-ds model-a)
+          prediction-b (ml/predict test-ds model-b)]
+      (is (not= prediction-a prediction-b)))))
