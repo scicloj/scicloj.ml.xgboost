@@ -361,6 +361,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                    0)
           _ (when (and (> (count watches) 1)
                        (not (instance? LinkedHashMap (:watches options)))
+                       (not (sequential? (:watches options)))
                        (not= 0 early-stopping-round))
               (log/warn "Early stopping indicated but watches has undefined iteration order.
   Early stopping will always use the 'last' of the watches as defined by the iteration
