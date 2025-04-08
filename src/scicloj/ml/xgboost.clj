@@ -187,10 +187,10 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                    (into-array Integer/TYPE (map :i x-i-s))
                    (into-array Float/TYPE (map :x x-i-s)))))
 
-(defn sparse-feature->dmatrix 
+(defn sparse-feature->dmatrix
   "converts columns containing smile.util.SparseArray to a sparse dmatrix"
   [feature-ds target-ds sparse-column n-sparse-columns]
-  {:dmatrix 
+  {:dmatrix
    (DMatrix.
     (.iterator
      ^Iterable (map
@@ -246,7 +246,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)]
-    
+
     ;; (def target-ds target-ds)
     ;; (def labels labels)
     ;; (def m m)
@@ -280,11 +280,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- dataset->dmatrix
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
-  (^DMatrix [feature-ds target-ds]
-   {:dmatrix            
+  ([feature-ds target-ds]
+   {:dmatrix
     (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
               nil)})
-  (^DMatrix [feature-ds]
+  ([feature-ds]
    (dataset->dmatrix feature-ds nil)))
 
 
