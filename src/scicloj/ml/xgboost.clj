@@ -176,7 +176,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 
-(defn- sparse->labeled-point [^SparseArray sparse target n-sparse-columns]
+(defn- sparse->labeled-point [^SparseArray sparse target weight n-sparse-columns]
   (let [x-i-s
         (mapv
          #(hash-map :i  (.i ^SparseArray$Entry %) :x (.x ^SparseArray$Entry %))
@@ -185,20 +185,26 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (LabeledPoint. target
                    n-sparse-columns
                    (into-array Integer/TYPE (map :i x-i-s))
-                   (into-array Float/TYPE (map :x x-i-s)))))
+                   (into-array Float/TYPE (map :x x-i-s))
+                   (float weight)
+                   -1
+                   Float/NaN)))
 
-(defn sparse-feature->dmatrix 
+(defn sparse-feature->dmatrix
   "converts columns containing smile.util.SparseArray to a sparse dmatrix"
-  [feature-ds target-ds sparse-column n-sparse-columns]
-  {:dmatrix 
+  [feature-ds target-ds weight-ds sparse-column n-sparse-columns]
+  {:dmatrix
    (DMatrix.
-    (.iterator
-     ^Iterable (map
-                (fn [features target ] (sparse->labeled-point features target n-sparse-columns))
-                (get feature-ds sparse-column)
-                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
-                     (repeat 0.0))))
-    nil)})
+     (.iterator
+       ^Iterable (map
+                   (fn [features target weight] (sparse->labeled-point features target weight n-sparse-columns))
+                   (get feature-ds sparse-column)
+                   (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
+                        (repeat 0.0))
+                   (if-not weight-ds
+                     (repeat 1.0)
+                     (dtype/->reader (ds-tens/dataset->tensor weight-ds :float32)))))
+     nil)})
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
@@ -246,7 +252,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (float-array (:values csr))
          DMatrix$SparseType/CSR
          n-col)]
-    
+
     ;; (def target-ds target-ds)
     ;; (def labels labels)
     ;; (def m m)
@@ -263,29 +269,42 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- dataset->labeled-point-iterator
   "Create an iterator to labeled points from a possibly quite large
   sequence of maps.  Sets expected length to length of first entry"
-  ^Iterable [feature-ds target-ds]
+  ^Iterable [feature-ds target-ds weight-ds]
   (let [feature-tens (ds-tens/dataset->tensor feature-ds :float32)
         target-tens (when target-ds
-                      (ds-tens/dataset->tensor target-ds :float32))]
+                      (ds-tens/dataset->tensor target-ds :float32))
+        weight-tens (when weight-ds
+                      (ds-tens/dataset->tensor weight-ds :float32))]
     (errors/when-not-errorf
      (or (not target-ds)
          (== 1 (ds/column-count target-ds)))
      "Multi-column regression/classification is not supported.  Target ds has %d columns"
      (ds/column-count target-ds))
-    (map (fn [features target]
-           (LabeledPoint. (float target) (first (dtype/shape features))  nil (dtype/->float-array features)))
-         feature-tens (or (when target-tens (dtype/->reader target-tens))
-                          (repeat (float 0.0))))))
+    (map (fn [features target weight]
+           (LabeledPoint. (float target)
+                          (first (dtype/shape features))
+                          nil
+                          (dtype/->float-array features)
+                          (float weight)
+                          -1
+                          Float/NaN))
+         feature-tens
+         (or (when target-tens (dtype/->reader target-tens))
+             (repeat (float 0.0)))
+         (or (when weight-tens (dtype/->reader weight-tens))
+             (repeat (float 1.0))))))
 
 (defn- dataset->dmatrix
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
-  (^DMatrix [feature-ds target-ds]
-   {:dmatrix            
-    (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds))
+  ([feature-ds target-ds weights-ds]
+   {:dmatrix
+    (DMatrix. (.iterator (dataset->labeled-point-iterator feature-ds target-ds weights-ds))
               nil)})
-  (^DMatrix [feature-ds]
-   (dataset->dmatrix feature-ds nil)))
+  ([feature-ds target-ds]
+   (dataset->dmatrix feature-ds target-ds nil))
+  ([feature-ds]
+   (dataset->dmatrix feature-ds nil nil)))
 
 
 (defn- options->objective
@@ -312,14 +331,15 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    :round (ml-gs/linear 5 46 5 :int64)
    :alpha (ml-gs/linear 0.01 0.31 30)})
 
-(defn ->dmatrix [feature-ds target-ds sparse-column n-sparse-columns]
+(defn ->dmatrix [feature-ds target-ds weight-ds sparse-column n-sparse-columns]
   (if sparse-column
-    (if (= (-> feature-ds (get sparse-column) first class)
-           SparseArray)
-      (sparse-feature->dmatrix feature-ds target-ds sparse-column n-sparse-columns)
-      (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns))
+     (if (= (-> feature-ds (get sparse-column) first class)
+                SparseArray)
+           (sparse-feature->dmatrix feature-ds target-ds weight-ds sparse-column n-sparse-columns)
+           (do (assert (not weight-ds) ":sample-weights on TidyText not supported")
+               (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)))
 
-    (dataset->dmatrix feature-ds target-ds)))
+    (dataset->dmatrix feature-ds target-ds weight-ds)))
 
 
 
@@ -350,6 +370,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                         (->dmatrix
                                          (ds/select-columns v feature-cnames)
                                          (ds/select-columns v target-cnames)
+                                         nil
                                          sparse-column-or-nil
                                          (:n-sparse-columns options))))
                                  watches)
@@ -361,6 +382,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                    0)
           _ (when (and (> (count watches) 1)
                        (not (instance? LinkedHashMap (:watches options)))
+                       (not (sequential? (:watches options)))
                        (not= 0 early-stopping-round))
               (log/warn "Early stopping indicated but watches has undefined iteration order.
   Early stopping will always use the 'last' of the watches as defined by the iteration
@@ -423,7 +445,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   (let [sparse-column-or-nil (:sparse-column options)
         feature-cnames (ds/column-names feature-ds)
         target-cnames (ds/column-names label-ds)
-        train-dmat (->dmatrix feature-ds label-ds sparse-column-or-nil (:n-sparse-columns options))
+        train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
         objective (options->objective options)
 
         label-map (when (multiclass-objective? objective)
@@ -433,7 +455,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes options]}]
   (let [sparse-column-or-nil (:sparse-column options)
-        dmatrix-context (->dmatrix feature-ds nil sparse-column-or-nil (:n-sparse-columns options))
+        dmatrix-context (->dmatrix feature-ds nil nil sparse-column-or-nil (:n-sparse-columns options))
         dmatrix (:dmatrix dmatrix-context)
         prediction (.predict ^Booster thawed-model dmatrix)
 
