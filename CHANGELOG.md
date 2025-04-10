@@ -1,7 +1,8 @@
 # ConstantChangeLog
 
 ## unreleased
-- made predition target datatypes symetric to train data 
+- made predition target datatypes symetric to train data
+- Support custom sample-weights (by @rschmukler)
 
 ## 6.3.0
 - options as malli
