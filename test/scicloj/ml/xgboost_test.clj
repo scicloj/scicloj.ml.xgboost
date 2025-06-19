@@ -46,7 +46,20 @@
                       (test-dataset verify/target-colname))]
     (is (= 25 (ds/row-count watch-data)))
     (is (not= 0 (dfn/reduce-+ (watch-data :test-ds))))
-    (is (< mse (double 0.2)))))
+    (is (< mse (double 0.2)))
+
+    (testing "custom metric"
+      (let [call-args* (atom nil)
+            options (merge options
+                           {:eval-metric
+                            ["Test"
+                             (fn [preds dtrain]
+                               (reset! call-args* [preds dtrain])
+                               (rand))]})
+            new-model (ml/train train-dataset options)]
+        (is (some? @call-args*))
+        (is (not= watch-data
+                  (get-in new-model [:model-data :metrics])))))))
 
 
 

@@ -385,6 +385,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                (LinkedHashMap.)))
           round (or (:round options) 25)
           custom-obj? (fn? objective)
+          custom-eval? (vector? (:eval-metric options))
           early-stopping-round (or (when (:early-stopping-round options)
                                      (int (:early-stopping-round options)))
                                    0)
@@ -403,8 +404,9 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                            (into {}))
           cleaned-options
           (->
-           (dissoc options :model-type :watches :objective)
-           (cond-> (not custom-obj?) (assoc :objective objective)))
+           (dissoc options :model-type :watches :objective :eval-metric)
+           (cond-> (not custom-obj?) (assoc :objective objective))
+           (cond-> (not custom-eval?) (assoc :eval-metric (:eval-metric options))))
           params (->>  cleaned-options
                         ;;Adding in some defaults
                        (merge
@@ -434,7 +436,12 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                           (reify IObjective
                                             (getGradient [_ predicts dtrain]
                                               (objective predicts dtrain))))
-                                        nil
+                                        (when custom-eval?
+                                          (let [[metric-name eval-fn] (:eval-metric options)]
+                                            (reify IEvaluation
+                                              (getMetric [_] metric-name)
+                                              (eval [_ predicts dtrain]
+                                                (eval-fn predicts dtrain)))))
                                         (int early-stopping-round))
           out-s (ByteArrayOutputStream.)]
       (.saveModel model out-s)
