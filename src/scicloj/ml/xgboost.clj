@@ -22,7 +22,7 @@
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
            [ml.dmlc.xgboost4j LabeledPoint]
-           [ml.dmlc.xgboost4j.java Booster DMatrix XGBoost DMatrix$SparseType]
+           [ml.dmlc.xgboost4j.java Booster DMatrix XGBoost DMatrix$SparseType IObjective IEvaluation]
            [smile.util SparseArray SparseArray$Entry]))
 
 
@@ -307,18 +307,25 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
    (dataset->dmatrix feature-ds nil nil)))
 
 
+(defn- options->model-type
+  [options]
+  (or (when (:model-type options)
+              (keyword (name (:model-type options))))
+            :linear-regression))
+
 (defn- options->objective
   [options]
-  (model-type->xgboost-objective
-   (or (when (:model-type options)
-         (keyword (name (:model-type options))))
-       :linear-regression)))
+  (or (:objective options)
+      (-> options
+          options->model-type
+          model-type->xgboost-objective)))
 
 
-(defn- multiclass-objective?
-  [objective]
-  (or (= objective "multi:softmax")
-      (= objective "multi:softprob")))
+(defn- multiclass-model-type?
+  [model-type]
+  (contains? #{:multiclass-softmax
+               :multiclass-softprob
+               :classification} model-type))
 
 
 (def ^:private hyperparameters
@@ -358,7 +365,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   [train-dmat-map feature-cnames target-cnames options label-map objective]
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
-  (locking #'multiclass-objective?
+  (locking #'multiclass-model-type?
     (let [
           train-dmat (:dmatrix train-dmat-map)
           sparse-column-or-nil (:sparse-column options)
@@ -377,6 +384,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                  ;;Linked hash map to preserve order
                                (LinkedHashMap.)))
           round (or (:round options) 25)
+          custom-obj? (fn? objective)
           early-stopping-round (or (when (:early-stopping-round options)
                                      (int (:early-stopping-round options)))
                                    0)
@@ -395,8 +403,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                            (into {}))
           cleaned-options
           (->
-           (dissoc options :model-type :watches)
-           (assoc :objective objective))
+           (dissoc options :model-type :watches :objective)
+           (cond-> (not custom-obj?) (assoc :objective objective)))
           params (->>  cleaned-options
                         ;;Adding in some defaults
                        (merge
@@ -411,7 +419,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                           {:num-class (count label-map)}))
                        (map (fn [[k v]]
                               (when v
-                                
                                 [(csk/->snake_case_string k) v])))
 
                        (remove nil?)
@@ -422,7 +429,12 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                      (into-array)))
           ^Booster model (XGBoost/train train-dmat params
                                         (long round)
-                                        (or watches {}) metrics-data nil nil
+                                        (or watches {}) metrics-data
+                                        (when custom-obj?
+                                          (reify IObjective
+                                            (getGradient [_ predicts dtrain]
+                                              (objective predicts dtrain))))
+                                        nil
                                         (int early-stopping-round))
           out-s (ByteArrayOutputStream.)]
       (.saveModel model out-s)
@@ -446,9 +458,10 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         feature-cnames (ds/column-names feature-ds)
         target-cnames (ds/column-names label-ds)
         train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
+        model-type (options->model-type options)
         objective (options->objective options)
 
-        label-map (when (multiclass-objective? objective)
+        label-map (when (multiclass-model-type? model-type)
                     (ds-mod/inference-target-label-map label-ds))]
     (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
 
@@ -465,7 +478,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         target-cname (first target-columns)
 
         prediction-df
-        (if (multiclass-objective? (options->objective options))
+        (if (multiclass-model-type? (options->model-type options))
           (->
            (model/finalize-classification predict-tensor
                                           target-cname
@@ -539,7 +552,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (doseq [objective (concat [:regression :classification]
                           (keys objective-types))]
   (let [reg-def (get objective-types objective)
-        model-meta 
+        model-meta
         {:thaw-fn thaw-model
          :explain-fn explain
          :hyperparameters hyperparameters
@@ -548,5 +561,3 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         model-meta (assoc-if model-meta :options (reg-def->options reg-def)) ]
     (ml/define-model! (keyword "xgboost" (name objective))
       train predict model-meta)))
-
- 
