@@ -1,6 +1,6 @@
 # ConstantChangeLog
 
-## unreleased
+## 6.4.0
 - made predition target datatypes symetric to train data
 - Support custom sample-weights (by @rschmukler)
 - Support custom objective function (by @rschmukler)
