@@ -3,11 +3,14 @@
 
 # scicloj.ml.xgboost
 
-xgboost models for [metamorph.ml](https://github.com/scicloj/metamorph.ml) 
+xgboost models for [metamorph.ml](https://github.com/scicloj/metamorph.ml)
 
 
 * For a more in-depth walkthrough of XGBoost features, checkout the
   [XGBoost topic](topics/xgboost_metrics.md).
+
+* For a look at some more advanced options, take a look at
+  [Advanced Options](topics/xgboost_advanced_options.md).
 
 ## License
 

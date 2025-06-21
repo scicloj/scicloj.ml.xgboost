@@ -3,6 +3,8 @@
 ## unreleased
 - made predition target datatypes symetric to train data
 - Support custom sample-weights (by @rschmukler)
+- Support custom objective function (by @rschmukler)
+- Support custom evaluation metric function (by @rschmukler)
 
 ## 6.3.0
 - options as malli

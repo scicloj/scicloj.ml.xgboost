@@ -46,7 +46,20 @@
                       (test-dataset verify/target-colname))]
     (is (= 25 (ds/row-count watch-data)))
     (is (not= 0 (dfn/reduce-+ (watch-data :test-ds))))
-    (is (< mse (double 0.2)))))
+    (is (< mse (double 0.2)))
+
+    (testing "custom metric"
+      (let [call-args* (atom nil)
+            options (merge options
+                           {:eval-metric
+                            ["Test"
+                             (fn [preds dtrain]
+                               (reset! call-args* [preds dtrain])
+                               (rand))]})
+            new-model (ml/train train-dataset options)]
+        (is (some? @call-args*))
+        (is (not= watch-data
+                  (get-in new-model [:model-data :metrics])))))))
 
 
 
@@ -274,21 +287,21 @@
           (ml/predict train-reviews model)
           (tc/select-columns [:label :document])
           (tc/order-by :document))
-         
+
          prediction-test
          (->
           (ml/predict test-review-clean model)
           (tc/select-columns [:label :document])
           (tc/order-by :document))
-         
+
          ]
 
-    
+
     (is (< 0.95
            (loss/classification-accuracy
             (mapv int (:label prediction-train))
             (vec trueth-train))))
-    
+
     (is (< 0.55
            (loss/classification-accuracy
             (mapv int (:label prediction-test))
@@ -382,3 +395,33 @@
           prediction-a (ml/predict test-ds model-a)
           prediction-b (ml/predict test-ds model-b)]
       (is (not= prediction-a prediction-b)))))
+
+(deftest custom-objective-support
+  (let [titanic (-> (ds/->dataset "test/data/titanic.csv")
+                    (ds/drop-columns ["Name"])
+                    (ds/update-column "Survived" (fn [col]
+                                                   (dtype/emap #(if (== 1 (long %))
+                                                                  "survived"
+                                                                  "drowned")
+                                                               :string col)))
+                    (ds-mod/set-inference-target "Survived"))
+
+        titanic-numbers (ds/categorical->number titanic cf/categorical)
+        split-data      (ds-mod/train-test-split titanic-numbers {:seed 1234})
+        train-ds        (:train-ds split-data)
+        test-ds         (:test-ds split-data)
+        call-args*    (atom nil)
+        model-a       (ml/train train-ds {:model-type :xgboost/classification})
+        model-b       (ml/train train-ds {:model-type :xgboost/classification
+                                          :objective
+                                          (fn [predicts dtrain]
+                                            (reset! call-args* [predicts dtrain])
+                                            ;; Returning nonsense gradients here
+                                            [(float-array (* 2 (count predicts))
+                                                          (repeatedly (* 2 (count predicts)) rand))
+                                             (float-array (* 2 (count predicts))
+                                                          (repeatedly (* 2 (count predicts)) rand))])})
+        predictions-a (ml/predict test-ds model-a)
+        predictions-b (ml/predict test-ds model-b)]
+    (is (some? @call-args*))
+    (is (not= predictions-a predictions-b))))
