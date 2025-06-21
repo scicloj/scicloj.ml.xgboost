@@ -19,3 +19,4 @@ example/results.nippy
 repeatedAbstrcats.txt
 test/data/amazon_reviews.libsvm
 test/data/amazon_reviews.csv
+pom.properties

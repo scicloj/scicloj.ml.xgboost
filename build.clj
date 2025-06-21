@@ -57,6 +57,14 @@
   (b/jar {:class-dir class-dir
           :jar-file (:jar-file (jar-opts {}))}))
 
+(defn generate-pom [_]
+  (b/write-pom {:target "."
+                :lib lib
+                :version version
+                :basis basis
+                :pom-data (pom-template)
+                :src-dirs ["src"]}))
+
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
   (-> opts
       (assoc :lib lib :version version
@@ -64,6 +72,7 @@
       (test)
       (bb/clean)
       (jar)))
+
 
 
 (defn install "Install the JAR locally." [opts]
