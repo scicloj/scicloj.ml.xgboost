@@ -1,5 +1,8 @@
 # ConstantChangeLog
 
+## Unreleased
+-  `predict` returns raw logits with a model from a custom objective (by @rschmukler)
+
 ## 6.4.0
 - made predition target datatypes symetric to train data
 - Support custom sample-weights (by @rschmukler)
