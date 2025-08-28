@@ -447,6 +447,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
       (.saveModel model out-s)
       (merge
        {:model-data (.toByteArray out-s)
+        :custom-obj? custom-obj?
         ;:tidy-text-dmatrix-order (:dmatrix-order train-dmat-map)
         }
        (when (seq watches)
@@ -473,11 +474,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
     (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
 
 (defn- predict
-  [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes options]}]
+  [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes model-data options]}]
   (let [sparse-column-or-nil (:sparse-column options)
         dmatrix-context (->dmatrix feature-ds nil nil sparse-column-or-nil (:n-sparse-columns options))
         dmatrix (:dmatrix dmatrix-context)
-        prediction (.predict ^Booster thawed-model dmatrix)
+        prediction (.predict ^Booster thawed-model dmatrix (:custom-obj? model-data))
 
         predict-tensor
         (->> prediction
