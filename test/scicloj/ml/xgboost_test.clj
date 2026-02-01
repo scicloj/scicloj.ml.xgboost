@@ -67,7 +67,7 @@
 (deftest classification
   (verify/basic-classification {:model-type :xgboost/classification} 0.25))
 
-(deftest sparse-train-does-not-crash []
+(deftest sparse-train []
   (let [reviews
         (->
          (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
@@ -86,6 +86,7 @@
                                (dtype/emap val-map :keyword col))))
          (ds/categorical->number cf/categorical)
          (ds-mod/set-inference-target :Score))
+
         model
         (ml/train reviews {:model-type :xgboost/classification
                            :sparse-column :bow-sparse
@@ -102,7 +103,7 @@
          (-> test-ds
              (ds-cat/reverse-map-categorical-xforms)
              :Score))]
-    (is (fm/approx= 0.672 (second (first (tc/rows explanation)))))
+    (is (fm/approx= 1.065 (second (first (tc/rows explanation)))))
     (is (> train-acc 0.97))))
 
 
@@ -133,13 +134,15 @@
     (is (= 0.9555555555555556 loss))
 
     (is (=
-         [{:importance-type "gain", :colname "petal_width", :gain 3.0993214419727266}
-          {:importance-type "gain", :colname "petal_length", :gain 2.8288314797695904}
-          {:importance-type "gain", :colname "sepal_width", :gain 0.272344306208}
-          {:importance-type "gain", :colname "sepal_length", :gain 0.12677490274290323}]
+         [{:importance-type "gain", :colname "petal_length", :gain 3.630239523007792}
+          {:importance-type "gain", :colname "petal_width", :gain 1.693951988557448}
+          {:importance-type "gain", :colname "sepal_width", :gain 0.28333890800451617}
+          {:importance-type "gain", :colname "sepal_length", :gain 0.13014046948115385}]
+
 
          (ds/rows
           (ml/explain model))))))
+
 
 
 (defn- test-options [train-ds test-ds options]
@@ -217,7 +220,7 @@
         model
         (ml/train iris-no-cat-map {:model-type :xgboost/classification
                                    :num-class 3})]
-    (is (= [ 0.0 2.0 1.0]
+    (is (= [0.0 2.0 1.0]
             (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
 
 
@@ -292,9 +295,7 @@
          (->
           (ml/predict test-review-clean model)
           (tc/select-columns [:label :document])
-          (tc/order-by :document))
-
-         ]
+         (tc/order-by :document))]
 
 
     (is (< 0.95
@@ -305,8 +306,7 @@
     (is (< 0.55
            (loss/classification-accuracy
             (mapv int (:label prediction-test))
-            (vec trueth-test))))
-    ))
+            (vec trueth-test))))))
 
 
 (defn- validate-target-symetry [datatype]

@@ -3,7 +3,6 @@
   Defines a full range of xgboost model definitions and supports xgboost explain
   functionality."
   (:require [clojure.set :as set]
-            [clojure.string :as s]
             [clojure.tools.logging :as log]
             [scicloj.metamorph.ml :as ml]
             [scicloj.metamorph.ml.gridsearch :as ml-gs]
@@ -179,7 +178,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- sparse->labeled-point [^SparseArray sparse target weight n-sparse-columns]
   (let [x-i-s
         (mapv
-         #(hash-map :i  (.i ^SparseArray$Entry %) :x (.x ^SparseArray$Entry %))
+         #(hash-map :i (.i ^SparseArray$Entry %)  
+                    :x (.x ^SparseArray$Entry %))
          (iterator-seq
           (.iterator sparse)))]
     (LabeledPoint. target

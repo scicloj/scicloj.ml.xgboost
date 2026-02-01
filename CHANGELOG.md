@@ -1,7 +1,8 @@
 # ConstantChangeLog
 
 ## Unreleased
--  `predict` returns raw logits with a model from a custom objective (by @rschmukler)
+- `predict` returns raw logits with a model from a custom objective (by @rschmukler)
+- upgraded to xgboost4j "3.1.1"
 
 ## 6.4.0
 - made predition target datatypes symetric to train data

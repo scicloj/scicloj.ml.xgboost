@@ -4,12 +4,9 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [scicloj.metamorph.ml.text :as text]
-   [scicloj.ml.xgboost :as xgboost]
    [tablecloth.api :as tc]
-   [tablecloth.column.api :as tcc]
-   [scicloj.ml.xgboost.csr :as csr]
-   [tech.v3.datatype :as dt]
-   [tech.v3.datatype.list :as dt-list]))
+   [tablecloth.column.api :as tcc]))
+
 (def max-lines 10000) ;  fails with 10000
 
 (def reviews
@@ -78,14 +75,14 @@
 
 
 
-;; https://www.kaggle.com/code/shivangamsoni/sentiment-analysis-tf-idf
-
+  ;; https://www.kaggle.com/code/shivangamsoni/sentiment-analysis-tf-idf
+  
   (import '[ml.dmlc.xgboost4j.java DMatrix])
 
 
-  (def dmatrix (DMatrix. "test/data/amazon_reviews.libsvm?format=libsvm"))
+  (def dmatrix (DMatrix. "test/data/amazon_reviews.libsvm?format=libsvm")) 
 
-
+  
   (def model
     (xgboost/train-from-dmatrix
      {:dmatrix dmatrix}
