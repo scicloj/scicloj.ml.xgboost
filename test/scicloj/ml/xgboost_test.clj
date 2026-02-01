@@ -221,80 +221,80 @@
         (ml/train iris-no-cat-map {:model-type :xgboost/classification
                                    :num-class 3})]
     (is (= [0.0 2.0 1.0]
-            (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
+           (keys (frequencies (:species (ml/predict iris-no-cat-map model))))))))
 
 
 (deftest tidy-text-train
-   (let [reviews
-         (->
-          (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
-                             line-seq
-                             (fn [line]
-                               (let [splitted (first
-                                               (csv/read-csv line))]
-                                 [(first splitted)
-                                  (dec (Integer/parseInt (second splitted)))]))
-                             (fn [text] (take 1000 (str/split text #" ")))
-                             :max-lines 10000
-                             :skip-lines 1)
+  (let [reviews
+        (->
+         (text/->tidy-text  (io/reader (GZIPInputStream. (io/input-stream "test/data/reviews.csv.gz")))
+                            line-seq
+                            (fn [line]
+                              (let [splitted (first
+                                              (csv/read-csv line))]
+                                [(first splitted)
+                                 (dec (Integer/parseInt (second splitted)))]))
+                            (fn [text] (take 1000 (str/split text #" ")))
+                            :max-lines 10000
+                            :skip-lines 1)
 
-          :datasets
-          first
-          (tc/drop-missing)
-          (text/->tfidf)
-          (tc/rename-columns {:meta :label}))
+         :datasets
+         first
+         (tc/drop-missing)
+         (text/->tfidf)
+         (tc/rename-columns {:meta :label}))
 
-         rnd-documents (shuffle (range 1000))
-         train-documents (into #{} (take 800 rnd-documents))
-         test-documents  (into #{} (take-last 200 rnd-documents))
+        rnd-documents (shuffle (range 1000))
+        train-documents (into #{} (take 800 rnd-documents))
+        test-documents  (into #{} (take-last 200 rnd-documents))
 
-         train-reviews
-         (-> reviews
-             (tc/select-rows (fn [row] (contains? train-documents (:document row))))
-             (ds-mod/set-inference-target :label))
+        train-reviews
+        (-> reviews
+            (tc/select-rows (fn [row] (contains? train-documents (:document row))))
+            (ds-mod/set-inference-target :label))
 
-         trueth-train
-         (-> train-reviews
-             (tc/select-columns [:document :label])
-             (tc/unique-by [:document :label])
-             (tc/order-by :document)
-             :label)
+        trueth-train
+        (-> train-reviews
+            (tc/select-columns [:document :label])
+            (tc/unique-by [:document :label])
+            (tc/order-by :document)
+            :label)
 
-         test-reviews
-         (-> reviews
-             (tc/select-rows (fn [row] (contains? test-documents (:document row)))))
+        test-reviews
+        (-> reviews
+            (tc/select-rows (fn [row] (contains? test-documents (:document row)))))
 
-         trueth-test
-         (-> test-reviews
-             (tc/select-columns [:document :label])
-             (tc/unique-by [:document :label])
-             (tc/order-by :document)
-             :label)
+        trueth-test
+        (-> test-reviews
+            (tc/select-columns [:document :label])
+            (tc/unique-by [:document :label])
+            (tc/order-by :document)
+            :label)
 
-         test-review-clean
-         (-> test-reviews
-             (tc/drop-columns [:label]))
-
-
-         n-sparse-columns (inc (apply max  (reviews :token-idx)))
-         model
-         (ml/train train-reviews {:model-type :xgboost/classification
-                                  :sparse-column :tfidf
-                                  :seed 123
-                                  :num-class 5
-                                  :n-sparse-columns n-sparse-columns})
+        test-review-clean
+        (-> test-reviews
+            (tc/drop-columns [:label]))
 
 
-         prediction-train
-         (->
-          (ml/predict train-reviews model)
-          (tc/select-columns [:label :document])
-          (tc/order-by :document))
+        n-sparse-columns (inc (apply max  (reviews :token-idx)))
+        model
+        (ml/train train-reviews {:model-type :xgboost/classification
+                                 :sparse-column :tfidf
+                                 :seed 123
+                                 :num-class 5
+                                 :n-sparse-columns n-sparse-columns})
 
-         prediction-test
-         (->
-          (ml/predict test-review-clean model)
-          (tc/select-columns [:label :document])
+
+        prediction-train
+        (->
+         (ml/predict train-reviews model)
+         (tc/select-columns [:label :document])
+         (tc/order-by :document))
+
+        prediction-test
+        (->
+         (ml/predict test-review-clean model)
+         (tc/select-columns [:label :document])
          (tc/order-by :document))]
 
 
@@ -311,18 +311,18 @@
 
 (defn- validate-target-symetry [datatype]
   (is (= datatype
-           (->>
-            (ml/train
-             (-> (ds/->dataset {:x [1 2 3 4]
-                                :y [:a :b :c :d]})
-                 (ds/categorical->number [:y] [] datatype)
-                 (ds-mod/set-inference-target [:y]))
-             {:model-type :xgboost/classification})
-            (ml/predict
-             (-> (ds/->dataset {:x [1 2 3 4]})))
-            :y
-            meta
-            :datatype))))
+         (->>
+          (ml/train
+           (-> (ds/->dataset {:x [1 2 3 4]
+                              :y [:a :b :c :d]})
+               (ds/categorical->number [:y] [] datatype)
+               (ds-mod/set-inference-target [:y]))
+           {:model-type :xgboost/classification})
+          (ml/predict
+           (-> (ds/->dataset {:x [1 2 3 4]})))
+          :y
+          meta
+          :datatype))))
 
 
 (deftest validate-target-sym
@@ -349,8 +349,8 @@
           split-data      (ds-mod/train-test-split titanic-numbers {:seed 1234})
           train-ds        (:train-ds split-data)
           weights         (ds/->dataset
-                            {:weight (repeatedly (ds/row-count train-ds) rand)}
-                            {:dataset-name "Weights"})
+                           {:weight (repeatedly (ds/row-count train-ds) rand)}
+                           {:dataset-name "Weights"})
           test-ds         (:test-ds split-data)
           model-a         (ml/train train-ds {:model-type :xgboost/classification})
           model-b         (ml/train train-ds {:model-type     :xgboost/classification
@@ -362,25 +362,25 @@
   (testing "sparse column support"
     (let [reviews
           (->
-            (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
-            (ds/select-columns [:Text :Score])
-            (nlp/count-vectorize :Text :bow nlp/default-text->bow)
-            (nb/bow->SparseArray :bow :bow-sparse {:create-vocab-fn #(nlp/->vocabulary-top-n % 100)})
-            (ds/drop-columns [:Text :bow])
-            (ds/update-column :Score
-                              (fn [col]
-                                (let [val-map {0 :c0
-                                               1 :c1
-                                               2 :c2
-                                               3 :c3
-                                               4 :c4
-                                               5 :c5}]
-                                  (dtype/emap val-map :keyword col))))
-            (ds/categorical->number cf/categorical)
-            (ds-mod/set-inference-target :Score))
+           (ds/->dataset "test/data/reviews.csv.gz" {:key-fn keyword})
+           (ds/select-columns [:Text :Score])
+           (nlp/count-vectorize :Text :bow nlp/default-text->bow)
+           (nb/bow->SparseArray :bow :bow-sparse {:create-vocab-fn #(nlp/->vocabulary-top-n % 100)})
+           (ds/drop-columns [:Text :bow])
+           (ds/update-column :Score
+                             (fn [col]
+                               (let [val-map {0 :c0
+                                              1 :c1
+                                              2 :c2
+                                              3 :c3
+                                              4 :c4
+                                              5 :c5}]
+                                 (dtype/emap val-map :keyword col))))
+           (ds/categorical->number cf/categorical)
+           (ds-mod/set-inference-target :Score))
           weights (ds/->dataset
-                    {:weight (repeatedly (ds/row-count reviews) rand)}
-                    {:dataset-name "Weights"})
+                   {:weight (repeatedly (ds/row-count reviews) rand)}
+                   {:dataset-name "Weights"})
           model-a
           (ml/train reviews {:model-type       :xgboost/classification
                              :sparse-column    :bow-sparse
@@ -425,3 +425,25 @@
         predictions-b (ml/predict test-ds model-b)]
     (is (some? @call-args*))
     (is (not= predictions-a predictions-b))))
+
+(comment 
+
+ (def data
+   (ml.dmlc.xgboost4j.java.DMatrix. "test/data/amazon_reviews.libsvm?format=libsvm"))
+
+ (def model
+   (scicloj.ml.xgboost/train
+    data
+    {:num-class 2
+     :model-type :xgboost/classification}))
+
+
+ (ml/train 
+  (-> 
+   (tc/dataset {:scicloj.ml.xgboost/dmatrix [data]
+                :dummy [0]
+                })
+   (ds-mod/set-inference-target :scicloj.ml.xgboost/dmatrix)
+   )
+  {:model-type :xgboost/classification}
+  ))

@@ -461,17 +461,28 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                (ds/->>dataset {:dataset-name :metrics}))})))))
 
 
-(defn train [feature-ds label-ds options]
-  (let [sparse-column-or-nil (:sparse-column options)
-        feature-cnames (ds/column-names feature-ds)
-        target-cnames (ds/column-names label-ds)
-        train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
-        model-type (options->model-type options)
-        objective (options->objective options)
+(defn train 
+  ([train-dmat options] 
+   (train-from-dmatrix
+    {:dmatrix train-dmat}
+    nil
+    nil
+    options
+    nil
+    (options->objective options)
+    )
+   )
+  ([feature-ds label-ds options]
+   (let [sparse-column-or-nil (:sparse-column options)
+         feature-cnames (ds/column-names feature-ds)
+         target-cnames (ds/column-names label-ds)
+         train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
+         model-type (options->model-type options)
+         objective (options->objective options)
 
-        label-map (when (multiclass-model-type? model-type)
-                    (ds-mod/inference-target-label-map label-ds))]
-    (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
+         label-map (when (multiclass-model-type? model-type)
+                     (ds-mod/inference-target-label-map label-ds))]
+     (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective))))
 
 (defn- predict
   [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes model-data options]}]
