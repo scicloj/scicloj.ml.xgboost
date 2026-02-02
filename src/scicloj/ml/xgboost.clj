@@ -294,7 +294,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (or (when weight-tens (dtype/->reader weight-tens))
              (repeat (float 1.0))))))
 
-(defn- dataset->dmatrix
+(defn dataset->dmatrix
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
   ([feature-ds target-ds weights-ds]

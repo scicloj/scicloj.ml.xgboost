@@ -2,6 +2,7 @@
 
 ## Unreleased
 - `predict` returns raw logits with a model from a custom objective (by @rschmukler)
+- made `dataset->dmatrix` public
 - upgraded to xgboost4j "3.1.1"
 
 ## 6.4.0
