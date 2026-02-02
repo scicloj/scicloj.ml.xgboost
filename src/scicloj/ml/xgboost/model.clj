@@ -24,8 +24,8 @@
 
 (defn finalize-classification
   ;; attention: this function might be smile specific
-  ;; it assumes a certain relation in the order of prediction probbalilities in `cls-tens`
-  ;; and teh categoricla map
+  ;; it assumes a certain relation in the order of prediction probabilities in `cls-tens`
+  ;; and the categorical map
 
   [cls-tens target-cname target-categorical-maps]
 
