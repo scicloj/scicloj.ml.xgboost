@@ -1,6 +1,6 @@
 # ConstantChangeLog
 
-## Unreleased
+## 6.5.0
 - `predict` returns raw logits with a model from a custom objective (by @rschmukler)
 - made `dataset->dmatrix` public
 - upgraded to xgboost4j "3.2.0"
