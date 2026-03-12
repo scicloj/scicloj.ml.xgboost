@@ -3,7 +3,8 @@
 ## Unreleased
 - `predict` returns raw logits with a model from a custom objective (by @rschmukler)
 - made `dataset->dmatrix` public
-- upgraded to xgboost4j "3.1.1"
+- upgraded to xgboost4j "3.2.0"
+- minimized hadoop dependencies via exclusion
 
 ## 6.4.0
 - made predition target datatypes symetric to train data
