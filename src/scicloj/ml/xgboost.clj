@@ -16,8 +16,7 @@
             [tech.v3.datatype.errors :as errors]
             [tech.v3.tensor :as dtt]
             [scicloj.ml.xgboost.csr :as csr]
-            [camel-snake-kebab.core :as csk]
-            )
+            [camel-snake-kebab.core :as csk])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.util LinkedHashMap Map]
            [ml.dmlc.xgboost4j LabeledPoint]
@@ -178,7 +177,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- sparse->labeled-point [^SparseArray sparse target weight n-sparse-columns]
   (let [x-i-s
         (mapv
-         #(hash-map :i (.i ^SparseArray$Entry %)  
+         #(hash-map :i (.i ^SparseArray$Entry %)
                     :x (.x ^SparseArray$Entry %))
          (iterator-seq
           (.iterator sparse)))]
@@ -195,16 +194,16 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   [feature-ds target-ds weight-ds sparse-column n-sparse-columns]
   {:dmatrix
    (DMatrix.
-     (.iterator
-       ^Iterable (map
-                   (fn [features target weight] (sparse->labeled-point features target weight n-sparse-columns))
-                   (get feature-ds sparse-column)
-                   (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
-                        (repeat 0.0))
-                   (if-not weight-ds
-                     (repeat 1.0)
-                     (dtype/->reader (ds-tens/dataset->tensor weight-ds :float32)))))
-     nil)})
+    (.iterator
+     ^Iterable (map
+                (fn [features target weight] (sparse->labeled-point features target weight n-sparse-columns))
+                (get feature-ds sparse-column)
+                (or  (get target-ds (first (ds-mod/inference-target-column-names target-ds)))
+                     (repeat 0.0))
+                (if-not weight-ds
+                  (repeat 1.0)
+                  (dtype/->reader (ds-tens/dataset->tensor weight-ds :float32)))))
+    nil)})
 
 
 (defn tidy-text-bow-ds->dmatrix [feature-ds target-ds text-feature-column n-col]
@@ -303,8 +302,8 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 (defn- options->model-type
   [options]
   (or (when (:model-type options)
-              (keyword (name (:model-type options))))
-            :linear-regression))
+        (keyword (name (:model-type options))))
+      :linear-regression))
 
 (defn- options->objective
   [options]
@@ -333,11 +332,11 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 (defn ->dmatrix [feature-ds target-ds weight-ds sparse-column n-sparse-columns]
   (if sparse-column
-     (if (= (-> feature-ds (get sparse-column) first class)
-                SparseArray)
-           (sparse-feature->dmatrix feature-ds target-ds weight-ds sparse-column n-sparse-columns)
-           (do (assert (not weight-ds) ":sample-weights on TidyText not supported")
-               (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)))
+    (if (= (-> feature-ds (get sparse-column) first class)
+           SparseArray)
+      (sparse-feature->dmatrix feature-ds target-ds weight-ds sparse-column n-sparse-columns)
+      (do (assert (not weight-ds) ":sample-weights on TidyText not supported")
+          (tidy-text-bow-ds->dmatrix feature-ds target-ds sparse-column n-sparse-columns)))
 
     (dataset->dmatrix feature-ds target-ds weight-ds)))
 
@@ -359,8 +358,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
   (locking #'multiclass-model-type?
-    (let [
-          train-dmat (:dmatrix train-dmat-map)
+    (let [train-dmat (:dmatrix train-dmat-map)
           sparse-column-or-nil (:sparse-column options)
           base-watches (or (:watches options) {})
           watches (->> base-watches
@@ -374,7 +372,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                                          sparse-column-or-nil
                                          (:n-sparse-columns options))))
                                  watches)
-                                 ;;Linked hash map to preserve order
+                               ;;Linked hash map to preserve order
                                (LinkedHashMap.)))
           round (or (:round options) 25)
           custom-obj? (fn? objective)
@@ -401,7 +399,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
            (cond-> (not custom-obj?) (assoc :objective objective))
            (cond-> (not custom-eval?) (assoc :eval-metric (:eval-metric options))))
           params (->>  cleaned-options
-                        ;;Adding in some defaults
+                       ;;Adding in some defaults
                        (merge
                         {:alpha 0.0
                          :eta 0.3
@@ -454,23 +452,35 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                (ds/->>dataset {:dataset-name :metrics}))})))))
 
 
-(defn train [feature-ds label-ds options]
-  (let [sparse-column-or-nil (:sparse-column options)
-        feature-cnames (ds/column-names feature-ds)
-        target-cnames (ds/column-names label-ds)
-        train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
-        model-type (options->model-type options)
-        objective (options->objective options)
+(defn train [data label-ds options]
+  (if (ds/dataset? data)
+    (let [feature-ds data
+          sparse-column-or-nil (:sparse-column options)
+          feature-cnames (ds/column-names feature-ds)
+          target-cnames (ds/column-names label-ds)
+          train-dmat (->dmatrix feature-ds label-ds (:sample-weights options) sparse-column-or-nil (:n-sparse-columns options))
+          model-type (options->model-type options)
+          objective (options->objective options)
+          
+          label-map (when (multiclass-model-type? model-type)
+                      (ds-mod/inference-target-label-map label-ds))]
+      (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective))
 
-        label-map (when (multiclass-model-type? model-type)
-                    (ds-mod/inference-target-label-map label-ds))]
-    (train-from-dmatrix train-dmat feature-cnames target-cnames options label-map objective)))
+    (train-from-dmatrix {:dmatrix data} nil nil options nil (options->objective options))
+    
+    ))
 
 (defn- predict
-  [feature-ds thawed-model {:keys [target-columns target-categorical-maps target-datatypes model-data options]}]
+  [data thawed-model 
+   {:keys [target-columns target-categorical-maps target-datatypes model-data options]}]
+  
   (let [sparse-column-or-nil (:sparse-column options)
-        dmatrix-context (->dmatrix feature-ds nil nil sparse-column-or-nil (:n-sparse-columns options))
-        dmatrix (:dmatrix dmatrix-context)
+        dmatrix-context
+        (if (ds/dataset? data)
+          (->dmatrix data nil nil sparse-column-or-nil (:n-sparse-columns options))
+          {:dmatrix data})
+
+        dmatrix  (:dmatrix dmatrix-context)
         prediction (.predict ^Booster thawed-model dmatrix (:custom-obj? model-data))
 
         predict-tensor
@@ -559,6 +569,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          :hyperparameters hyperparameters
          :documentation {:javadoc "https://xgboost.readthedocs.io/en/latest/jvm/javadocs/index.html"
                          :user-guide "https://xgboost.readthedocs.io/en/latest/jvm/index.html"}}
-        model-meta (assoc-if model-meta :options (reg-def->options reg-def)) ]
+        model-meta (assoc-if model-meta :options (reg-def->options reg-def))]
     (ml/define-model! (keyword "xgboost" (name objective))
       train predict model-meta)))

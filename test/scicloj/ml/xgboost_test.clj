@@ -11,15 +11,19 @@
             [scicloj.ml.smile.discrete-nb :as nb]
             [scicloj.ml.smile.nlp :as nlp]
             [fastmath.core :as fm]
-            [scicloj.ml.xgboost]
+            [scicloj.ml.xgboost :as xgboost]
             [tablecloth.api :as tc]
             [tech.v3.dataset :as ds]
+            [scicloj.metamorph.ml.metrics :as metrics]
             [tech.v3.dataset.categorical :as ds-cat]
             [tech.v3.dataset.column-filters :as cf]
             [tech.v3.dataset.modelling :as ds-mod]
             [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.functional :as dfn])
-  (:import [java.util.zip GZIPInputStream]))
+            [tech.v3.datatype.functional :as dfn]
+            [same.core :refer [ish? zeroish? set-comparator!]]
+            [same.compare])
+  (:import [java.util.zip GZIPInputStream]
+           [ml.dmlc.xgboost4j.java DMatrix]))
 
 
 (deftest basic
@@ -425,3 +429,26 @@
         predictions-b (ml/predict test-ds model-b)]
     (is (some? @call-args*))
     (is (not= predictions-a predictions-b))))
+
+
+(set-comparator! (same.compare/compare-ulp 1e12 2))
+
+(deftest dmatrix
+  
+  (let [dm (DMatrix. "test/data/iris.libsvm.txt?format=libsvm")
+        model-options {:model-type :xgboost/classification
+                       :num-class 4}
+        model (xgboost/train dm nil model-options)
+        prediction
+        (#'xgboost/predict
+         dm
+         (-> model :model-data (#'xgboost/thaw-model))
+         {:model-data {:custom-obj? false}
+          :options model-options})
+        accuracy (metrics/accuracy
+                  (.getLabel dm)
+                  (map float (get prediction nil)))]
+    (is (ish? 0.7866 accuracy)))
+
+  )
+
