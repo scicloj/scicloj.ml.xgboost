@@ -1,5 +1,8 @@
 # ConstantChangeLog
 
+## 6.5.1
+ - use metamorph.ml 1.3.2 (and so TTC/TMD 8.0.16)
+ 
 ## 6.5.0
 - `predict` returns raw logits with a model from a custom objective (by @rschmukler)
 - made `dataset->dmatrix` public
