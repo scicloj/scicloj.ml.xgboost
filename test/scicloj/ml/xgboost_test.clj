@@ -21,9 +21,11 @@
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.functional :as dfn]
             [same.core :refer [ish? zeroish? set-comparator!]]
-            [same.compare])
+            [same.compare]
+            )
   (:import [java.util.zip GZIPInputStream]
            [ml.dmlc.xgboost4j.java DMatrix]))
+
 
 
 (deftest basic
