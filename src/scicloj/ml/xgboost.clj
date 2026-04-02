@@ -23,7 +23,6 @@
            [ml.dmlc.xgboost4j.java Booster DMatrix XGBoost DMatrix$SparseType IObjective IEvaluation]
            [smile.util SparseArray SparseArray$Entry]))
 
-(println "start loading ns 'scicloj.ml.xgboost")
 
 (def objective-types
   {:linear-regression
@@ -189,7 +188,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                    -1
                    Float/NaN)))
 
-(defn sparse-feature->dmatrix
+(defn- sparse-feature->dmatrix
   "converts columns containing smile.util.SparseArray to a sparse dmatrix"
   [feature-ds target-ds weight-ds sparse-column n-sparse-columns]
   {:dmatrix
@@ -286,7 +285,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
          (or (when weight-tens (dtype/->reader weight-tens))
              (repeat (float 1.0))))))
 
-(defn dataset->dmatrix
+(defn- dataset->dmatrix
   "Dataset is a sequence of maps.  Each contains a feature key.
   Returns a dmatrix."
   ([feature-ds target-ds weights-ds]
@@ -560,8 +559,6 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                     :any))
                  (:options reg-def)))))
 
-(println "registering models of ns 'scicloj.ml.xgboost")
-(println :objectives (keys objective-types))
 (doseq [objective (concat [:regression :classification]
                           (keys objective-types))]
   (let [reg-def (get objective-types objective)
@@ -574,4 +571,3 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
         model-meta (assoc-if model-meta :options (reg-def->options reg-def))]
     (ml/define-model! (keyword "xgboost" (name objective))
       train predict model-meta)))
-(println "Finished registering models of ns 'scicloj.ml.xgboost")
