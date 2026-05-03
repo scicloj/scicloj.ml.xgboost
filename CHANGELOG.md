@@ -1,5 +1,9 @@
 # ConstantChangeLog
 
+## unreleased
+ - made some internal fn private
+ - use metamorph 1.5.1
+
 ## 6.5.1
  - use metamorph.ml 1.3.2 (and so TTC/TMD 8.0.16)
  

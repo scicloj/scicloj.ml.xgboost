@@ -352,7 +352,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
 
 
 
-(defn train-from-dmatrix
+(defn- train-from-dmatrix
   [train-dmat-map feature-cnames target-cnames options label-map objective]
   ;;XGBoost uses all cores so serialization here avoids over subscribing
   ;;the machine.
@@ -451,7 +451,7 @@ subsample may be set to as low as 0.1 without loss of model accuracy. Note that 
                (ds/->>dataset {:dataset-name :metrics}))})))))
 
 
-(defn train [data label-ds options]
+(defn- train [data label-ds options]
   (if (ds/dataset? data)
     (let [feature-ds data
           sparse-column-or-nil (:sparse-column options)

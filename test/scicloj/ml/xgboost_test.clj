@@ -440,7 +440,7 @@
   (let [dm (DMatrix. "test/data/iris.libsvm.txt?format=libsvm")
         model-options {:model-type :xgboost/classification
                        :num-class 4}
-        model (xgboost/train dm nil model-options)
+        model (#'xgboost/train dm nil model-options)
         prediction
         (#'xgboost/predict
          dm
